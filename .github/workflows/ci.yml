@@ -17,25 +17,51 @@ jobs:
 
       # Use the same GNU *host* toolchain (not an MSVC host with a GNU
       # cross-target) as local development, so `cargo build` with no
-      # --target flag lands on x86_64-pc-windows-gnu and the linker path
-      # hardcoded in .cargo/config.toml applies unmodified.
+      # --target flag lands on x86_64-pc-windows-gnu.
       - name: Install GNU-host Rust toolchain
         run: |
           rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal --component clippy,rustfmt
           rustup default stable-x86_64-pc-windows-gnu
         shell: bash
 
-      # `location` is pinned explicitly: setup-msys2's default ("fresh
-      # install", i.e. release: true) does not guarantee landing at
-      # C:\msys64 -- it can install into a temp path instead, which would
-      # silently break .cargo/config.toml's hardcoded linker path.
+      # release: false reuses the MSYS2 install that's already baked into the
+      # windows-latest runner image, rather than extracting a fresh copy on
+      # top of it (release: true's default) -- that extract-over-existing
+      # pattern is what left gcc.exe missing before. We don't assume WHERE
+      # that install lives; we read it back from the action's own
+      # msys2-location output in the next step instead.
       - name: Set up MSYS2 UCRT64 (GCC toolchain)
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           install: mingw-w64-ucrt-x86_64-gcc
-          location: C:\msys64
+          release: false
           update: true
+
+      # .cargo/config.toml hardcodes an absolute linker path for local dev
+      # convenience, but CI can't assume that path is correct -- rewrite it
+      # (CI checkout only, never committed) to wherever MSYS2 actually
+      # landed, and fail fast with a clear message if gcc genuinely isn't
+      # there instead of surfacing a confusing error deep in some
+      # dependency's build script.
+      - name: Point cargo at the resolved MSYS2 GCC toolchain
+        shell: pwsh
+        run: |
+          $root = "${{ steps.msys2.outputs.msys2-location }}"
+          $gcc = Join-Path $root "ucrt64\bin\gcc.exe"
+          $ar = Join-Path $root "ucrt64\bin\ar.exe"
+          if (-not (Test-Path $gcc)) {
+            Write-Error "gcc.exe not found at $gcc after MSYS2 setup (msys2-location='$root'). The mingw-w64-ucrt-x86_64-gcc package install likely failed."
+            exit 1
+          }
+          @"
+          [target.x86_64-pc-windows-gnu]
+          linker = '$gcc'
+          ar = '$ar'
+          "@ | Set-Content .cargo/config.toml -NoNewline
+          Write-Host "Resolved MSYS2 root: $root"
+          Write-Host "Linker: $gcc"
 
       - name: Cache cargo registry and build artifacts
         uses: actions/cache@v4
