@@ -7,18 +7,53 @@
 <meta name="description" content="A btop-styled TUI resource monitor for Windows, built in Rust with a Zero-WMI architecture and a ~18 MB memory footprint.">
 <link rel="icon" href="resources/icon.png" type="image/png">
 <style>
+  /* Palette lifted directly from src/theme.rs (Theme::dark() / Theme::light()) */
   :root{
-    --bg:#11151c;
-    --bg-panel:#161b24;
-    --border:#2a3444;
-    --border-focus:#5ee6d0;
-    --text:#d7dee8;
-    --text-dim:#7c8898;
-    --accent:#5ee6d0;
-    --accent2:#8ad1ff;
-    --amber:#f2c14e;
-    --coral:#ff6b6b;
+    --bg:#0a0d13;
+    --bg-panel:#0e131b;
+    --border:#374155;
+    --accent-border:#00dcff;
+    --accent:#00ffe6;
+    --text:#e2e8f0;
+    --text-dim:#73829b;
+    --text-bright:#ffffff;
+    --cpu-low:#34d399;
+    --cpu-mid:#fbbf24;
+    --cpu-high:#f87171;
+    --mem:#38bdf8;
+    --mem2:#a855f7;
+    --gpu:#d946ef;
+    --gpu2:#f472b6;
+    --net-rx:#2dd4bf;
+    --net-tx:#fb923c;
+    --disk-read:#60a5fa;
+    --disk-write:#f43f5e;
+    --proc-sel-bg:#1e3a8a;
+    --proc-sel-fg:#ffffff;
     --mono:"Cascadia Code","JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f1ec;
+    --bg-panel:#ffffff;
+    --border:#bec8d7;
+    --accent-border:#2563eb;
+    --accent:#1d4ed8;
+    --text:#1e293b;
+    --text-dim:#64748b;
+    --text-bright:#0f172a;
+    --cpu-low:#16a34a;
+    --cpu-mid:#d97706;
+    --cpu-high:#dc2626;
+    --mem:#0284c7;
+    --mem2:#7c3aed;
+    --gpu:#9333ea;
+    --gpu2:#be185d;
+    --net-rx:#0d9488;
+    --net-tx:#c2410c;
+    --disk-read:#2563eb;
+    --disk-write:#b91c1c;
+    --proc-sel-bg:#bfdbfe;
+    --proc-sel-fg:#0f172a;
   }
   *{box-sizing:border-box;}
   html{background:var(--bg);}
@@ -30,261 +65,346 @@
     line-height:1.55;
     padding:0 16px;
   }
-  .wrap{max-width:920px;margin:0 auto;padding-block:48px 64px;}
-  a{color:var(--accent2);text-decoration:none;}
+  a{color:var(--accent-border);text-decoration:none;}
   a:hover{text-decoration:underline;}
-  .eyebrow{
-    color:var(--accent);
-    letter-spacing:.12em;
-    text-transform:uppercase;
-    font-size:12px;
-    margin:0 0 10px;
+  code{font-family:var(--mono);}
+  .cursor{
+    display:inline-block;
+    width:.55em;
+    height:1em;
+    background:var(--accent);
+    vertical-align:text-bottom;
+    animation:blink 1s steps(1) infinite;
+    margin-left:2px;
   }
-  h1{
-    font-size:clamp(32px,6vw,52px);
-    margin:0 0 8px;
-    letter-spacing:-0.01em;
+  @keyframes blink{50%{opacity:0;}}
+
+  .page{max-width:960px;margin:0 auto;padding-block:24px 56px;}
+
+  .term{border:3px double var(--accent-border);background:var(--bg);}
+
+  .term-bar{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+    padding:10px 18px;border-bottom:1px solid var(--border);
   }
+  .term-left{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+  .logo{color:var(--accent);font-weight:700;font-size:15px;}
+  .uptime{color:var(--text-dim);font-size:12px;}
+  .term-right{display:flex;flex-wrap:wrap;gap:8px;}
+  .badge{
+    font-family:inherit;font-size:12px;background:transparent;
+    border:1px solid var(--border);color:var(--text);
+    padding:4px 9px;cursor:pointer;text-decoration:none;line-height:1.4;
+  }
+  .badge b{color:var(--accent);font-weight:700;}
+  .badge:hover{border-color:var(--accent-border);color:var(--text-bright);text-decoration:none;}
+
+  .term-body{padding:8px 26px 4px;}
+
+  .hero{padding-top:22px;}
+  .eyebrow{color:var(--accent);letter-spacing:.12em;text-transform:uppercase;font-size:12px;margin:0 0 10px;}
+  h1{font-size:clamp(30px,6vw,48px);margin:0 0 8px;letter-spacing:-.01em;}
   h1 .arrow{color:var(--accent);}
-  .tagline{
-    color:var(--text-dim);
-    font-size:clamp(15px,2.4vw,18px);
-    max-width:60ch;
-    margin:0 0 24px;
-  }
-  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px;}
-  .badges img{display:block;height:28px;}
-  .cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:40px;}
+  .tagline{color:var(--text-dim);font-size:clamp(14px,2.4vw,17px);max-width:60ch;margin:0 0 18px;}
+  .prompt{color:var(--text-dim);font-size:13.5px;margin:0 0 22px;}
+  .prompt .exe{color:var(--text-bright);}
+
+  .badges-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;}
+  .badges-row img{display:block;height:26px;}
+
+  .cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:34px;}
   .btn{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:11px 18px;
-    border-radius:6px;
-    border:1px solid var(--border);
-    background:var(--bg-panel);
-    color:var(--text);
-    font-family:var(--mono);
-    font-size:14px;
-    font-weight:600;
+    font-family:inherit;font-size:13.5px;font-weight:700;
+    border:1px solid var(--border);background:transparent;color:var(--text);
+    padding:10px 16px;
   }
-  .btn:hover{border-color:var(--border-focus);text-decoration:none;color:var(--text);}
-  .btn.primary{background:var(--accent);color:#0b1016;border-color:var(--accent);}
-  .btn.primary:hover{background:var(--accent2);border-color:var(--accent2);}
-  .shot{
-    width:100%;
-    border-radius:10px;
-    border:1px solid var(--border);
-    box-shadow:0 20px 60px -20px rgba(0,0,0,.6);
-    margin-bottom:56px;
-    display:block;
+  .btn:before{content:"[ ";color:var(--text-dim);}
+  .btn:after{content:" ]";color:var(--text-dim);}
+  .btn:hover{border-color:var(--accent-border);color:var(--text-bright);text-decoration:none;}
+  .btn.primary{border-color:var(--accent);color:var(--accent);}
+  .btn.primary:hover{background:var(--accent);color:var(--bg);}
+  .btn.primary:hover:before,.btn.primary:hover:after{color:var(--bg);}
+
+  .panel{position:relative;border:1px solid var(--border);padding:30px 22px 24px;margin:0 0 34px;background:var(--bg);}
+  .panel-title{
+    position:absolute;top:0;left:16px;transform:translateY(-50%);
+    background:var(--bg);padding:0 8px;color:var(--accent);
+    font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
   }
-  h2{
-    font-size:13px;
-    text-transform:uppercase;
-    letter-spacing:.1em;
-    color:var(--accent);
-    border-bottom:1px solid var(--border);
-    padding-bottom:10px;
-    margin:0 0 20px;
-  }
-  section{margin-bottom:52px;}
-  .grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-    gap:18px;
-  }
-  .card{
-    background:var(--bg-panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:16px 18px;
-  }
-  .card h3{
-    margin:0 0 8px;
-    font-size:14px;
-    color:var(--text);
-  }
-  .card h3 .dot{color:var(--accent);margin-right:8px;}
-  .card p{margin:0;color:var(--text-dim);font-size:13.5px;}
+
+  .shot{width:100%;display:block;border:1px solid var(--border);}
+
+  .perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;}
+  .perf-card{text-align:center;border:1px solid var(--border);background:var(--bg-panel);padding:16px 8px;}
+  .perf-card .num{font-size:21px;font-weight:700;color:var(--accent);}
+  .perf-card .lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;}
+
+  .sub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;}
+  .sub-card{border:1px solid var(--border);border-left:3px solid var(--c,var(--accent));background:var(--bg-panel);padding:14px 15px;}
+  .sub-card h3{margin:0 0 6px;font-size:13.5px;color:var(--text-bright);}
+  .sub-card p{margin:0;color:var(--text-dim);font-size:13px;}
+  .c-cpu{--c:var(--cpu-mid);}
+  .c-mem{--c:var(--mem);}
+  .c-disk{--c:var(--disk-read);}
+  .c-gpu{--c:var(--gpu);}
+  .c-net{--c:var(--net-rx);}
+  .c-proc{--c:var(--accent-border);}
+
+  .engine-list{list-style:none;margin:0;padding:0;display:grid;gap:14px;}
+  .engine-list li{position:relative;padding-left:22px;color:var(--text-dim);font-size:13.5px;}
+  .engine-list li:before{content:"\25B8";position:absolute;left:0;color:var(--accent);}
+  .engine-list li strong{color:var(--text);}
+
+  .platforms{display:flex;gap:14px;flex-wrap:wrap;}
+  .plat{border:1px solid var(--border);background:var(--bg-panel);padding:14px 18px;flex:1;min-width:210px;}
+  .plat .name{font-weight:700;color:var(--text-bright);}
+  .plat .asset{color:var(--accent);font-size:13px;}
+  .plat .note{color:var(--text-dim);font-size:12.5px;margin-top:4px;}
+
   table{width:100%;border-collapse:collapse;font-size:13.5px;}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
   th{color:var(--text-dim);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.06em;}
+  tbody tr:hover{background:var(--proc-sel-bg);color:var(--proc-sel-fg);}
+  tbody tr:hover td{color:var(--proc-sel-fg);}
   kbd{
-    background:var(--bg);
-    border:1px solid var(--border);
-    border-radius:4px;
-    padding:2px 7px;
-    color:var(--accent);
-    font-family:var(--mono);
-    font-size:12.5px;
+    background:var(--bg-panel);border:1px solid var(--border);
+    padding:2px 7px;color:var(--accent);font-family:inherit;font-size:12.5px;
   }
-  .perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
-  .perf-card{text-align:center;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:18px 10px;}
-  .perf-card .num{font-size:22px;font-weight:700;color:var(--accent);}
-  .perf-card .lbl{font-size:11.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;}
+
   pre{
-    background:var(--bg-panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:14px 16px;
-    overflow-x:auto;
-    font-size:13.5px;
-    color:var(--accent2);
+    background:var(--bg-panel);border:1px solid var(--border);
+    padding:14px 16px;overflow-x:auto;font-size:13.5px;color:var(--accent-border);margin:0 0 12px;
   }
-  .platforms{display:flex;gap:14px;flex-wrap:wrap;}
-  .plat{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:14px 18px;flex:1;min-width:220px;}
-  .plat .name{font-weight:700;color:var(--text);}
-  .plat .asset{color:var(--accent);font-size:13px;}
-  .plat .note{color:var(--text-dim);font-size:12.5px;margin-top:4px;}
-  .license-box{
-    background:var(--bg-panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:18px 20px;
-    color:var(--text-dim);
-    font-size:13.5px;
-  }
+  .hint{color:var(--text-dim);font-size:12.5px;margin:0;}
+
+  .license-box{color:var(--text-dim);font-size:13.5px;}
   .license-box strong{color:var(--text);}
-  footer{
-    border-top:1px solid var(--border);
-    padding-top:24px;
-    color:var(--text-dim);
-    font-size:13px;
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:space-between;
-    gap:10px;
+
+  .term-footer{
+    border-top:1px solid var(--border);padding:14px 18px;
+    display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;
+    color:var(--text-dim);font-size:12.5px;
   }
-  footer a{color:var(--text-dim);}
-  footer a:hover{color:var(--accent2);}
+  .term-footer a{color:var(--text-dim);}
+  .term-footer a:hover{color:var(--accent-border);}
+
   @media (max-width:480px){
-    .wrap{padding-block:32px 48px;}
+    .page{padding-block:16px 40px;}
+    .term-bar{padding:10px 12px;}
+    .term-body{padding:4px 14px 2px;}
+    .panel{padding:28px 14px 18px;}
   }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="page">
+  <div class="term">
 
-  <p class="eyebrow">Windows &middot; TUI &middot; Rust</p>
-  <h1><span class="arrow">&#10148;</span> wtop</h1>
-  <p class="tagline">A resource monitor for Windows with the aesthetic and visual density of <code>btop</code> &mdash; designed to have a literally minimal footprint on the system it's watching.</p>
-
-  <div class="badges">
-    <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
-    <img src="https://img.shields.io/badge/Windows_11-0078D6?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 11">
-    <img src="https://img.shields.io/badge/ratatui-0.29-blue?style=for-the-badge" alt="ratatui 0.29">
-    <img src="https://img.shields.io/badge/Architecture-x86__64%20%7C%20ARM64-informational?style=for-the-badge" alt="x86_64 | ARM64">
-    <img src="https://img.shields.io/badge/License-PolyForm_Noncommercial-red?style=for-the-badge" alt="License: PolyForm Noncommercial">
-  </div>
-
-  <div class="cta-row">
-    <a class="btn primary" href="https://github.com/Vinello28/wtop/releases/latest">&#8681; Download latest release</a>
-    <a class="btn" href="https://github.com/Vinello28/wtop">View source on GitHub</a>
-    <a class="btn" href="https://github.com/Vinello28/wtop#readme">Read the docs</a>
-  </div>
-
-  <img class="shot" src="resources/rdm1.png" alt="wtop running in a Windows terminal, showing CPU, memory, disk, GPU, network and process panels">
-
-  <section>
-    <h2>Performance, measured on Windows 11</h2>
-    <div class="perf-grid">
-      <div class="perf-card"><div class="num">~18 MB</div><div class="lbl">RAM working set</div></div>
-      <div class="perf-card"><div class="num">&lt; 0.05%</div><div class="lbl">CPU usage (active)</div></div>
-      <div class="perf-card"><div class="num">2.6 MB</div><div class="lbl">Binary size</div></div>
-      <div class="perf-card"><div class="num">0%</div><div class="lbl">Terminal flicker</div></div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Key features</h2>
-    <div class="grid">
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Full hardware visualization</h3>
-        <p>CPU (global + up to 128 per-core bars, model via CPUID), RAM &amp; commit, disks &amp; I/O throughput, GPU utilization &amp; VRAM, network up/down, and an advanced sortable, filterable, killable process list.</p>
+    <div class="term-bar">
+      <div class="term-left">
+        <span class="logo">&#11144; wtop</span>
+        <span class="uptime" id="uptime">up 0s</span>
       </div>
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Sub-pixel braille graphics</h3>
-        <p>Braille Unicode characters (U+2800&ndash;U+28FF) give a 2&times;4 sub-pixel resolution per cell &mdash; smooth, dense history curves identical to btop.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Zero-WMI architecture</h3>
-        <p>No <code>WmiPrvSE.exe</code>, no COM serialization overhead. Every metric comes from direct Win32 / NTDLL calls: <code>NtQuerySystemInformation</code>, <code>GlobalMemoryStatusEx</code>, <code>GetIfTable2</code>, native PDH.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Isolated collector thread</h3>
-        <p>A dedicated worker thread samples hardware state and hands immutable snapshots to the render thread &mdash; the UI never blocks and redraws at 60&nbsp;FPS.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Dual 24-bit TrueColor themes</h3>
-        <p>Dark charcoal + neon accents, or an alabaster light theme for bright environments. Toggle instantly with <kbd>t</kbd>, saved to your config.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot">&#9632;</span>Dynamic sampling rate</h3>
-        <p>Adjust the refresh interval live with <kbd>+</kbd> / <kbd>-</kbd> &mdash; 250ms up to 5000ms &mdash; to trade responsiveness for even lower overhead.</p>
+      <div class="term-right">
+        <button class="badge" id="theme-toggle" type="button">[<b>t</b>: <span id="theme-label">DARK</span>]</button>
+        <a class="badge" href="#shortcuts">[<b>?</b>: Help]</a>
+        <a class="badge" href="https://github.com/Vinello28" target="_blank" rel="noopener">[<b>g</b>: GitHub]</a>
+        <a class="badge" href="https://github.com/Vinello28/wtop/releases/latest" target="_blank" rel="noopener">[<b>u</b>: Releases]</a>
       </div>
     </div>
-  </section>
 
-  <section>
-    <h2>Supported platforms</h2>
-    <div class="platforms">
-      <div class="plat">
-        <div class="name">x86_64 (Intel / AMD)</div>
-        <div class="asset">wtop.exe</div>
-        <div class="note">Primary build, directly tested</div>
+    <div class="term-body">
+
+      <section class="hero">
+        <p class="eyebrow">Windows &middot; TUI &middot; Rust</p>
+        <h1><span class="arrow">&#10148;</span> wtop</h1>
+        <p class="tagline">A resource monitor for Windows with the aesthetic and visual density of <code>btop</code> &mdash; designed to have a literally minimal footprint on the system it's watching.</p>
+        <p class="prompt">C:\Users\you&gt; <span class="exe">wtop.exe</span><span class="cursor"></span></p>
+
+        <div class="badges-row">
+          <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
+          <img src="https://img.shields.io/badge/Windows_11-0078D6?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 11">
+          <img src="https://img.shields.io/badge/ratatui-0.29-blue?style=for-the-badge" alt="ratatui 0.29">
+          <img src="https://img.shields.io/badge/Architecture-x86__64%20%7C%20ARM64-informational?style=for-the-badge" alt="x86_64 | ARM64">
+          <img src="https://img.shields.io/badge/License-PolyForm_Noncommercial-red?style=for-the-badge" alt="License: PolyForm Noncommercial">
+        </div>
+
+        <div class="cta-row">
+          <a class="btn primary" href="https://github.com/Vinello28/wtop/releases/latest">&#8681; Download latest release</a>
+          <a class="btn" href="https://github.com/Vinello28/wtop">View source on GitHub</a>
+          <a class="btn" href="https://github.com/Vinello28/wtop#readme">Read the docs</a>
+        </div>
+      </section>
+
+      <div class="panel" id="preview">
+        <span class="panel-title">Preview</span>
+        <img class="shot" src="resources/rdm1.png" alt="wtop running in a Windows terminal, showing CPU, memory, disk, GPU, network and process panels">
       </div>
-      <div class="plat">
-        <div class="name">ARM64 (Windows on ARM)</div>
-        <div class="asset">wtop-arm64.exe</div>
-        <div class="note">Native build, cross-compiled in CI</div>
+
+      <div class="panel" id="performance">
+        <span class="panel-title">Performance &mdash; measured on Windows 11</span>
+        <div class="perf-grid">
+          <div class="perf-card"><div class="num">~18 MB</div><div class="lbl">RAM working set</div></div>
+          <div class="perf-card"><div class="num">&lt; 0.05%</div><div class="lbl">CPU usage (active)</div></div>
+          <div class="perf-card"><div class="num">2.6 MB</div><div class="lbl">Binary size</div></div>
+          <div class="perf-card"><div class="num">0%</div><div class="lbl">Terminal flicker</div></div>
+        </div>
       </div>
-    </div>
-    <p style="color:var(--text-dim);font-size:13px;margin-top:14px;">The in-app auto-updater detects the running binary's architecture and always fetches the matching asset. The previous executable is deleted automatically once the update completes.</p>
-  </section>
 
-  <section>
-    <h2>Keyboard shortcuts</h2>
-    <table>
-      <thead><tr><th>Key</th><th>Action</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>Tab</kbd> / <kbd>Shift-Tab</kbd></td><td>Switch the active (focused) panel</td></tr>
-        <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd> or <kbd>k</kbd> / <kbd>j</kbd></td><td>Scroll the process list</td></tr>
-        <tr><td><kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Jump 10 processes up / down</td></tr>
-        <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>Go to the start / end of the process list</td></tr>
-        <tr><td><kbd>c</kbd> / <kbd>m</kbd> / <kbd>p</kbd> / <kbd>n</kbd></td><td>Sort processes by CPU / RAM / PID / Name</td></tr>
-        <tr><td><kbd>d</kbd></td><td>Reverse sort direction</td></tr>
-        <tr><td><kbd>/</kbd></td><td>Real-time process search / filter</td></tr>
-        <tr><td><kbd>x</kbd> or <kbd>Delete</kbd></td><td>Terminate the selected process</td></tr>
-        <tr><td><kbd>t</kbd></td><td>Toggle theme (Dark &harr; Light)</td></tr>
-        <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Increase / decrease the sampling rate</td></tr>
-        <tr><td><kbd>u</kbd></td><td>Apply the update if a new version is available</td></tr>
-        <tr><td><kbd>g</kbd></td><td>Open the developer's GitHub profile</td></tr>
-        <tr><td><kbd>?</kbd> or <kbd>h</kbd></td><td>Show the help window</td></tr>
-        <tr><td><kbd>q</kbd> or <kbd>Esc</kbd></td><td>Quit wtop / clear active filter</td></tr>
-      </tbody>
-    </table>
-  </section>
+      <div class="panel" id="subsystems">
+        <span class="panel-title">Monitored subsystems</span>
+        <div class="sub-grid">
+          <div class="sub-card c-cpu">
+            <h3>CPU</h3>
+            <p>Global utilization with a high-density braille history graph, plus up to 128 per-core load bars on a green &rarr; amber &rarr; coral gradient. Model read straight from CPUID.</p>
+          </div>
+          <div class="sub-card c-mem">
+            <h3>MEMORY</h3>
+            <p>Used, available and total physical RAM, commit limit / commit charge, and a dedicated history graph.</p>
+          </div>
+          <div class="sub-card c-disk">
+            <h3>DISK</h3>
+            <p>Mounted volumes with free/total space and real-time read/write throughput via high-performance counters.</p>
+          </div>
+          <div class="sub-card c-gpu">
+            <h3>GPU</h3>
+            <p>3D/Compute engine utilization (WDDM DirectX), allocated dedicated VRAM, and the graphics adapter name.</p>
+          </div>
+          <div class="sub-card c-net">
+            <h3>NETWORK</h3>
+            <p>Real-time download/upload throughput via the native IP Helper interface table, plus total session traffic and the active adapter name.</p>
+          </div>
+          <div class="sub-card c-proc">
+            <h3>PROCESSES</h3>
+            <p>Sortable by CPU%, RSS memory, PID or name, with instant search/filter and process termination.</p>
+          </div>
+        </div>
+      </div>
 
-  <section>
-    <h2>Build from source</h2>
-    <pre>git clone https://github.com/Vinello28/wtop.git
+      <div class="panel" id="engine">
+        <span class="panel-title">Under the hood</span>
+        <ul class="engine-list">
+          <li><strong>Sub-pixel braille graphics</strong> &mdash; Braille Unicode (U+2800&ndash;U+28FF) gives a 2&times;4 sub-pixel resolution per cell, for curves as smooth and dense as btop's.</li>
+          <li><strong>Zero-WMI architecture</strong> &mdash; no <code>WmiPrvSE.exe</code>, no COM serialization. Every metric comes from direct Win32 / NTDLL calls: <code>NtQuerySystemInformation</code>, <code>GlobalMemoryStatusEx</code>, <code>GetIfTable2</code>, native PDH.</li>
+          <li><strong>Isolated collector thread</strong> &mdash; a dedicated worker samples hardware and hands immutable snapshots to the render thread, so the UI never blocks and redraws at 60&nbsp;FPS.</li>
+          <li><strong>Dual 24-bit TrueColor themes</strong> &mdash; dark charcoal with neon accents, or an alabaster light theme for bright rooms. Toggle instantly with <kbd>t</kbd>, saved to config.</li>
+          <li><strong>Dynamic sampling rate</strong> &mdash; adjust the refresh interval live with <kbd>+</kbd> / <kbd>-</kbd>, from 250ms up to 5000ms, to trade responsiveness for even lower overhead.</li>
+        </ul>
+      </div>
+
+      <div class="panel" id="platforms">
+        <span class="panel-title">Supported platforms</span>
+        <div class="platforms">
+          <div class="plat">
+            <div class="name">x86_64 (Intel / AMD)</div>
+            <div class="asset">wtop.exe</div>
+            <div class="note">Primary build, directly tested</div>
+          </div>
+          <div class="plat">
+            <div class="name">ARM64 (Windows on ARM)</div>
+            <div class="asset">wtop-arm64.exe</div>
+            <div class="note">Native build, cross-compiled in CI</div>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:14px;">The in-app auto-updater detects the running binary's architecture and always fetches the matching asset &mdash; the previous executable is deleted automatically once the update completes.</p>
+      </div>
+
+      <div class="panel" id="shortcuts">
+        <span class="panel-title">Keyboard shortcuts</span>
+        <table>
+          <thead><tr><th>Key</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Tab</kbd> / <kbd>Shift-Tab</kbd></td><td>Switch the active (focused) panel</td></tr>
+            <tr><td><kbd>&uarr;</kbd> / <kbd>&darr;</kbd> or <kbd>k</kbd> / <kbd>j</kbd></td><td>Scroll the process list</td></tr>
+            <tr><td><kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Jump 10 processes up / down</td></tr>
+            <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>Go to the start / end of the process list</td></tr>
+            <tr><td><kbd>c</kbd> / <kbd>m</kbd> / <kbd>p</kbd> / <kbd>n</kbd></td><td>Sort processes by CPU / RAM / PID / Name</td></tr>
+            <tr><td><kbd>d</kbd></td><td>Reverse sort direction</td></tr>
+            <tr><td><kbd>/</kbd></td><td>Real-time process search / filter</td></tr>
+            <tr><td><kbd>x</kbd> or <kbd>Delete</kbd></td><td>Terminate the selected process</td></tr>
+            <tr><td><kbd>t</kbd></td><td>Toggle theme (Dark &harr; Light)</td></tr>
+            <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Increase / decrease the sampling rate</td></tr>
+            <tr><td><kbd>u</kbd></td><td>Apply the update if a new version is available</td></tr>
+            <tr><td><kbd>g</kbd></td><td>Open the developer's GitHub profile</td></tr>
+            <tr><td><kbd>?</kbd> or <kbd>h</kbd></td><td>Show the help window</td></tr>
+            <tr><td><kbd>q</kbd> or <kbd>Esc</kbd></td><td>Quit wtop / clear active filter</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel" id="build">
+        <span class="panel-title">Build from source</span>
+        <pre>git clone https://github.com/Vinello28/wtop.git
 cd wtop
 cargo build --release
 .\target\release\wtop.exe</pre>
-    <p style="color:var(--text-dim);font-size:13px;">User configuration (theme, sampling rate, sort order) is saved automatically to <code>%APPDATA%\wtop\config.json</code>.</p>
-  </section>
+        <p class="hint">User configuration (theme, sampling rate, sort order) is saved automatically to <code>%APPDATA%\wtop\config.json</code>.</p>
+      </div>
 
-  <section>
-    <h2>License</h2>
-    <div class="license-box">
-      wtop is licensed under the <strong><a href="https://github.com/Vinello28/wtop/blob/master/LICENSE">PolyForm Noncommercial License 1.0.0</a></strong>. You're free to use, modify, and share it for any noncommercial purpose &mdash; personal use, research, education, hobby projects. Commercial use requires a separate agreement with the copyright holder.
+      <div class="panel" id="license">
+        <span class="panel-title">License</span>
+        <p class="license-box">
+          wtop is licensed under the <strong><a href="https://github.com/Vinello28/wtop/blob/master/LICENSE">PolyForm Noncommercial License 1.0.0</a></strong>. You're free to use, modify, and share it for any noncommercial purpose &mdash; personal use, research, education, hobby projects. Commercial use requires a separate agreement with the copyright holder.
+        </p>
+      </div>
+
     </div>
-  </section>
 
-  <footer>
-    <span>&copy; 2026 Gabriele Vianello</span>
-    <span><a href="https://github.com/Vinello28">github.com/Vinello28</a> &middot; <a href="https://github.com/Vinello28/wtop/issues">Report an issue</a></span>
-  </footer>
+    <div class="term-footer">
+      <span>wtop@Vinello28 ~ $<span class="cursor"></span></span>
+      <span>&copy; 2026 Gabriele Vianello &middot; <a href="https://github.com/Vinello28/wtop/issues">Report an issue</a></span>
+    </div>
 
+  </div>
 </div>
+
+<script>
+(function () {
+  // Theme toggle: mirrors the app's own `t` shortcut and the exact two
+  // palettes in src/theme.rs (dark() / light()), persisted per-browser.
+  var root = document.documentElement;
+  var toggle = document.getElementById('theme-toggle');
+  var label = document.getElementById('theme-label');
+
+  function apply(mode) {
+    if (mode === 'light') {
+      root.setAttribute('data-theme', 'light');
+    } else {
+      root.removeAttribute('data-theme');
+    }
+    if (label) label.textContent = mode === 'light' ? 'LIGHT' : 'DARK';
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem('wtop-theme'); } catch (e) {}
+  apply(saved === 'light' ? 'light' : 'dark');
+
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      apply(next);
+      try { localStorage.setItem('wtop-theme', next); } catch (e) {}
+    });
+  }
+
+  // Faux uptime counter, next to the logo -- the same "up {duration}"
+  // readout the real app's header shows, just counting time on this page.
+  var uptimeEl = document.getElementById('uptime');
+  if (uptimeEl) {
+    var start = Date.now();
+    var fmt = function (s) {
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+      if (m > 0) return m + 'm ' + String(sec).padStart(2, '0') + 's';
+      return sec + 's';
+    };
+    var tick = function () {
+      uptimeEl.textContent = 'up ' + fmt(Math.floor((Date.now() - start) / 1000));
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+})();
+</script>
 </body>
 </html>
