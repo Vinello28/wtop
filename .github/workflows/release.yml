@@ -152,9 +152,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      # shell: pwsh, not bash -- GitHub's Windows runner's `bash` is Git for
+      # Windows' Git Bash, which prepends its own C:\Program Files\Git\usr\bin
+      # to PATH on startup. That directory ships a GNU coreutils `link`
+      # (hardlink creation), and it shadows MSVC's real link.exe ahead of the
+      # paths ilammy/msvc-dev-cmd just set up, so the linker silently becomes
+      # the wrong `link` and fails with a "extra operand" usage error.
       - name: Build release binary
         run: cargo build --release --target aarch64-pc-windows-msvc
-        shell: bash
+        shell: pwsh
         # NOTE: unverified in CI as of this writing -- this is the first
         # ARM64 build of this project. rustls' `ring` crypto backend is the
         # main risk (it needs working aarch64-pc-windows-msvc assembly
