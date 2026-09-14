@@ -1,5 +1,5 @@
-use std::mem;
 use crate::model::{CpuCore, CpuData};
+use std::mem;
 
 #[repr(C)]
 #[derive(Copy, Clone, Default, Debug)]
@@ -31,11 +31,13 @@ impl CpuCollector {
     pub fn new(max_history: usize) -> Self {
         let model_name = get_cpu_model_name();
         let query_fn = unsafe {
-            let ntdll = windows_sys::Win32::System::LibraryLoader::LoadLibraryA(b"ntdll.dll\0".as_ptr());
+            let ntdll = windows_sys::Win32::System::LibraryLoader::LoadLibraryA(
+                c"ntdll.dll".as_ptr().cast(),
+            );
             if !ntdll.is_null() {
                 let proc = windows_sys::Win32::System::LibraryLoader::GetProcAddress(
                     ntdll,
-                    b"NtQuerySystemInformation\0".as_ptr(),
+                    c"NtQuerySystemInformation".as_ptr().cast(),
                 );
                 proc.map(|p| mem::transmute(p))
             } else {
@@ -118,7 +120,10 @@ impl CpuCollector {
                 }
             } else {
                 for i in 0..current.len() {
-                    cores.push(CpuCore { id: i, usage_pct: 0.0 });
+                    cores.push(CpuCore {
+                        id: i,
+                        usage_pct: 0.0,
+                    });
                 }
             }
             self.prev_cores = current;

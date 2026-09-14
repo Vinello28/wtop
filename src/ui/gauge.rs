@@ -1,15 +1,9 @@
+use crate::theme::Theme;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
-use crate::theme::Theme;
 
-pub fn render_mini_bar(
-    buf: &mut Buffer,
-    area: Rect,
-    pct: f64,
-    theme: &Theme,
-    empty_char: char,
-) {
+pub fn render_mini_bar(buf: &mut Buffer, area: Rect, pct: f64, theme: &Theme, empty_char: char) {
     if area.width < 1 || area.height < 1 {
         return;
     }
@@ -29,22 +23,22 @@ pub fn render_mini_bar(
         let y = area.y;
 
         if i < full_blocks {
-            buf[(x, y)].set_char('█').set_style(Style::default().fg(color));
+            buf[(x, y)]
+                .set_char('█')
+                .set_style(Style::default().fg(color));
         } else if i == full_blocks && remainder > 0 {
-            buf[(x, y)].set_char(sub_blocks[remainder]).set_style(Style::default().fg(color));
+            buf[(x, y)]
+                .set_char(sub_blocks[remainder])
+                .set_style(Style::default().fg(color));
         } else {
-            buf[(x, y)].set_char(empty_char).set_style(Style::default().fg(theme.border_normal));
+            buf[(x, y)]
+                .set_char(empty_char)
+                .set_style(Style::default().fg(theme.border_normal));
         }
     }
 }
 
-pub fn render_dual_bar(
-    buf: &mut Buffer,
-    area: Rect,
-    pct: f64,
-    color: Color,
-    dim_color: Color,
-) {
+pub fn render_dual_bar(buf: &mut Buffer, area: Rect, pct: f64, color: Color, dim_color: Color) {
     if area.width < 1 || area.height < 1 {
         return;
     }
@@ -63,11 +57,17 @@ pub fn render_dual_bar(
         let y = area.y;
 
         if i < full_blocks {
-            buf[(x, y)].set_char('█').set_style(Style::default().fg(color));
+            buf[(x, y)]
+                .set_char('█')
+                .set_style(Style::default().fg(color));
         } else if i == full_blocks && remainder > 0 {
-            buf[(x, y)].set_char(sub_blocks[remainder]).set_style(Style::default().fg(color));
+            buf[(x, y)]
+                .set_char(sub_blocks[remainder])
+                .set_style(Style::default().fg(color));
         } else {
-            buf[(x, y)].set_char('░').set_style(Style::default().fg(dim_color));
+            buf[(x, y)]
+                .set_char('░')
+                .set_style(Style::default().fg(dim_color));
         }
     }
 }

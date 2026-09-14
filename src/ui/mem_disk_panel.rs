@@ -1,11 +1,12 @@
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, BorderType, Widget};
 use crate::model::{DiskIoData, MemoryData};
 use crate::theme::Theme;
 use crate::ui::braille::BrailleChart;
 use crate::ui::gauge::{format_bytes, format_speed, render_dual_bar, render_mini_bar};
+use crate::ui::text::{draw_str, draw_str_with};
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
 pub fn render_mem_disk_panel(
     buf: &mut Buffer,
@@ -51,15 +52,16 @@ pub fn render_mem_disk_panel(
             format_bytes(mem.total_bytes)
         );
 
-        let mut x = mem_area.x;
-        for ch in mem_line1.chars() {
-            if x < mem_area.right() {
-                buf[(x, mem_area.y)]
-                    .set_char(ch)
-                    .set_style(Style::default().fg(theme.mem_primary).add_modifier(Modifier::BOLD));
-                x += 1;
-            }
-        }
+        draw_str(
+            buf,
+            mem_area.x,
+            mem_area.y,
+            mem_area.right(),
+            &mem_line1,
+            Style::default()
+                .fg(theme.mem_primary)
+                .add_modifier(Modifier::BOLD),
+        );
 
         // RAM Usage Bar
         if mem_area.height >= 3 && mem_area.width > 12 {
@@ -69,7 +71,13 @@ pub fn render_mem_disk_panel(
                 width: (mem_area.width / 2).max(12),
                 height: 1,
             };
-            render_dual_bar(buf, bar_area, mem.usage_pct, theme.mem_primary, theme.border_normal);
+            render_dual_bar(
+                buf,
+                bar_area,
+                mem.usage_pct,
+                theme.mem_primary,
+                theme.border_normal,
+            );
 
             // Right side of bar: Braille history if room
             let chart_w = mem_area.width.saturating_sub(bar_area.width + 2);
@@ -80,7 +88,8 @@ pub fn render_mem_disk_panel(
                     width: chart_w,
                     height: mem_area.height.min(3),
                 };
-                let chart = BrailleChart::new(&mem.history, 100.0, theme.mem_primary, theme.mem_secondary);
+                let chart =
+                    BrailleChart::new(&mem.history, 100.0, theme.mem_primary, theme.mem_secondary);
                 chart.render(chart_area, buf);
             }
         }
@@ -93,15 +102,14 @@ pub fn render_mem_disk_panel(
                 format_bytes(mem.commit_used_bytes),
                 format_bytes(mem.commit_total_bytes)
             );
-            let mut sx = mem_area.x;
-            for ch in swap_line.chars() {
-                if sx < mem_area.right() {
-                    buf[(sx, mem_area.y + 2)]
-                        .set_char(ch)
-                        .set_style(Style::default().fg(theme.text_dim));
-                    sx += 1;
-                }
-            }
+            draw_str(
+                buf,
+                mem_area.x,
+                mem_area.y + 2,
+                mem_area.right(),
+                &swap_line,
+                Style::default().fg(theme.text_dim),
+            );
         }
     }
 
@@ -113,36 +121,40 @@ pub fn render_mem_disk_panel(
             format_speed(io.write_bytes_sec),
             format_speed(io.read_bytes_sec)
         );
-        let mut x = disk_area.x;
-        for ch in io_line.chars() {
-            let color = if ch == '▲' {
-                theme.disk_write
-            } else if ch == '▼' {
-                theme.disk_read
-            } else {
-                theme.text_main
-            };
-            if x < disk_area.right() {
-                buf[(x, disk_area.y)]
-                    .set_char(ch)
-                    .set_style(Style::default().fg(color).add_modifier(Modifier::BOLD));
-                x += 1;
-            }
-        }
+        draw_str_with(
+            buf,
+            disk_area.x,
+            disk_area.y,
+            disk_area.right(),
+            &io_line,
+            |ch| {
+                let color = if ch == '▲' {
+                    theme.disk_write
+                } else if ch == '▼' {
+                    theme.disk_read
+                } else {
+                    theme.text_main
+                };
+                Style::default().fg(color).add_modifier(Modifier::BOLD)
+            },
+        );
 
         // Partitions list
-        let mut cur_y = disk_area.y + 1;
-        for part in &io.partitions {
+        for (i, part) in io.partitions.iter().enumerate() {
+            let cur_y = disk_area.y + 1 + i as u16;
             if cur_y >= disk_area.bottom() {
                 break;
             }
 
             let part_label = format!("{:<3} ", part.mount);
-            let mut px = disk_area.x;
-            for ch in part_label.chars() {
-                buf[(px, cur_y)].set_char(ch).set_style(Style::default().fg(theme.text_dim));
-                px += 1;
-            }
+            let px = draw_str(
+                buf,
+                disk_area.x,
+                cur_y,
+                disk_area.right(),
+                &part_label,
+                Style::default().fg(theme.text_dim),
+            );
 
             let bar_w = (disk_area.width / 4).clamp(6, 14);
             let bar_area = Rect {
@@ -159,17 +171,14 @@ pub fn render_mem_disk_panel(
                 format_bytes(part.free_bytes),
                 format_bytes(part.total_bytes)
             );
-            let mut dx = px + bar_w;
-            for ch in details.chars() {
-                if dx < disk_area.right() {
-                    buf[(dx, cur_y)]
-                        .set_char(ch)
-                        .set_style(Style::default().fg(theme.text_main));
-                    dx += 1;
-                }
-            }
-
-            cur_y += 1;
+            draw_str(
+                buf,
+                px + bar_w,
+                cur_y,
+                disk_area.right(),
+                &details,
+                Style::default().fg(theme.text_main),
+            );
         }
     }
 }

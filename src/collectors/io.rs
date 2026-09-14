@@ -1,12 +1,12 @@
+use crate::model::{DiskIoData, DiskPartition};
 use std::mem;
 use windows_sys::Win32::Storage::FileSystem::{
     GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW,
 };
 use windows_sys::Win32::System::Performance::{
-    PdhAddEnglishCounterW, PdhCloseQuery, PdhCollectQueryData, PdhGetFormattedCounterValue,
-    PdhOpenQueryW, PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE,
+    PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PdhAddEnglishCounterW, PdhCloseQuery,
+    PdhCollectQueryData, PdhGetFormattedCounterValue, PdhOpenQueryW,
 };
-use crate::model::{DiskIoData, DiskPartition};
 
 fn to_wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -58,13 +58,25 @@ impl IoCollector {
                 if PdhCollectQueryData(self.pdh_query) == 0 {
                     if self.h_read != 0 {
                         let mut val: PDH_FMT_COUNTERVALUE = mem::zeroed();
-                        if PdhGetFormattedCounterValue(self.h_read, PDH_FMT_DOUBLE, std::ptr::null_mut(), &mut val) == 0 {
+                        if PdhGetFormattedCounterValue(
+                            self.h_read,
+                            PDH_FMT_DOUBLE,
+                            std::ptr::null_mut(),
+                            &mut val,
+                        ) == 0
+                        {
                             read_bytes_sec = val.Anonymous.doubleValue.max(0.0);
                         }
                     }
                     if self.h_write != 0 {
                         let mut val: PDH_FMT_COUNTERVALUE = mem::zeroed();
-                        if PdhGetFormattedCounterValue(self.h_write, PDH_FMT_DOUBLE, std::ptr::null_mut(), &mut val) == 0 {
+                        if PdhGetFormattedCounterValue(
+                            self.h_write,
+                            PDH_FMT_DOUBLE,
+                            std::ptr::null_mut(),
+                            &mut val,
+                        ) == 0
+                        {
                             write_bytes_sec = val.Anonymous.doubleValue.max(0.0);
                         }
                     }

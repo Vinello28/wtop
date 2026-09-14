@@ -1,9 +1,9 @@
+use crate::model::GpuData;
 use std::mem;
 use windows_sys::Win32::System::Performance::{
-    PdhAddEnglishCounterW, PdhCloseQuery, PdhCollectQueryData, PdhGetFormattedCounterArrayW,
-    PdhOpenQueryW, PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE,
+    PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PdhAddEnglishCounterW, PdhCloseQuery,
+    PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
 };
-use crate::model::GpuData;
 
 fn to_wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -92,7 +92,8 @@ impl GpuCollector {
                             &mut buffer_size,
                             &mut item_count,
                             buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W,
-                        ) == 0 {
+                        ) == 0
+                        {
                             let items = std::slice::from_raw_parts(
                                 buf.as_ptr() as *const PDH_FMT_COUNTERVALUE_ITEM_W,
                                 item_count as usize,
@@ -129,7 +130,8 @@ impl GpuCollector {
                             &mut buffer_size,
                             &mut item_count,
                             buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W,
-                        ) == 0 {
+                        ) == 0
+                        {
                             let items = std::slice::from_raw_parts(
                                 buf.as_ptr() as *const PDH_FMT_COUNTERVALUE_ITEM_W,
                                 item_count as usize,
@@ -195,19 +197,26 @@ fn get_gpu_adapter_name() -> String {
     ) -> i32;
 
     unsafe {
-        let user32 = windows_sys::Win32::System::LibraryLoader::LoadLibraryA(b"user32.dll\0".as_ptr());
+        let user32 =
+            windows_sys::Win32::System::LibraryLoader::LoadLibraryA(c"user32.dll".as_ptr().cast());
         if !user32.is_null() {
             let proc = windows_sys::Win32::System::LibraryLoader::GetProcAddress(
                 user32,
-                b"EnumDisplayDevicesW\0".as_ptr(),
+                c"EnumDisplayDevicesW".as_ptr().cast(),
             );
             if let Some(func) = proc {
                 let enum_fn: EnumDisplayDevicesWFn = mem::transmute(func);
                 let mut dev: DisplayDeviceW = mem::zeroed();
                 dev.cb = mem::size_of::<DisplayDeviceW>() as u32;
                 if enum_fn(std::ptr::null(), 0, &mut dev, 0) != 0 {
-                    let len = dev.device_string.iter().position(|&c| c == 0).unwrap_or(dev.device_string.len());
-                    let name = String::from_utf16_lossy(&dev.device_string[..len]).trim().to_string();
+                    let len = dev
+                        .device_string
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(dev.device_string.len());
+                    let name = String::from_utf16_lossy(&dev.device_string[..len])
+                        .trim()
+                        .to_string();
                     if !name.is_empty() {
                         return name;
                     }

@@ -40,6 +40,19 @@
 
 ---
 
+## Piattaforme Supportate
+
+Le release GitHub pubblicano un binario nativo per ciascuna architettura:
+
+| Architettura | Asset | Note |
+| :--- | :--- | :--- |
+| **x86_64** (Intel/AMD) | `wtop.exe` | Build primaria, testata direttamente |
+| **ARM64** (Windows on ARM, es. Snapdragon X) | `wtop-arm64.exe` | Build nativa cross-compilata in CI |
+
+L'auto-updater in-app riconosce automaticamente l'architettura del binario in esecuzione e scarica sempre l'asset corretto.
+
+---
+
 ## Scorciatoie da Tastiera
 
 | Tasto | Azione |
@@ -57,6 +70,7 @@
 | `x` oppure `Delete` | Termina il processo selezionato (con richiesta di conferma `y`/`n`) |
 | `t` | Commuta tema (**Dark** ↔ **Light**) |
 | `+` / `-` | Aumenta o diminuisce la frequenza di campionamento |
+| `u` | Applica l'aggiornamento se una nuova versione è disponibile |
 | `?` oppure `h` | Mostra la finestra di aiuto con tutte le scorciatoie |
 | `q` oppure `Esc` | Chiudi wtop / Cancella filtro attivo |
 

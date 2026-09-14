@@ -1,0 +1,162 @@
+name: Release
+
+# Push a tag like v0.2.0 to build and publish a GitHub Release with the
+# Windows binaries attached. The in-app self-updater (src/updater.rs) picks
+# its asset by exact name depending on the architecture it was itself
+# compiled for: "wtop.exe" (x86_64) or "wtop-arm64.exe" (aarch64) -- both are
+# published bare (unzipped) alongside per-arch zips for manual downloaders.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Cheap, fails fast: the self-updater trusts the tag to match the binary's
+  # compiled-in CARGO_PKG_VERSION, so a mismatch must stop the whole release
+  # before either architecture spends build minutes.
+  check-version:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches Cargo.toml version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v',''
+          $cargoVersion = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
+          if ($tag -ne $cargoVersion) {
+            Write-Error "Tag v$tag does not match Cargo.toml version $cargoVersion"
+            exit 1
+          }
+          Write-Host "Tag v$tag matches Cargo.toml version $cargoVersion"
+
+  build-x64:
+    needs: check-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GNU-host Rust toolchain
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+          rustup default stable-x86_64-pc-windows-gnu
+        shell: bash
+
+      - name: Set up MSYS2 UCRT64 (GCC toolchain)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          update: true
+
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-x64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binary
+        run: cargo build --release
+        shell: bash
+
+      # This is a GNU-*host* build (not an MSVC host cross-compiling to a
+      # GNU target), so the output has no target-triple subdirectory --
+      # it's directly at target/release/wtop.exe.
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target/release/wtop.exe dist/wtop.exe
+          Compress-Archive -Path target/release/wtop.exe -DestinationPath "dist/wtop-${{ github.ref_name }}-x86_64-pc-windows-gnu.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-x64
+          path: dist/*
+          retention-days: 1
+
+  build-arm64:
+    needs: check-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Native ARM64 Windows build: unlike the x64 job, this targets MSVC
+      # (there's no MSYS2/mingw-w64 toolchain for aarch64-pc-windows-*), so
+      # it does NOT reuse .cargo/config.toml's GCC linker override -- that
+      # section is scoped to [target.x86_64-pc-windows-gnu] only and is
+      # inert here.
+      - name: Install MSVC-host Rust toolchain with the ARM64 target
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-msvc --profile minimal
+          rustup default stable-x86_64-pc-windows-msvc
+          rustup target add aarch64-pc-windows-msvc
+        shell: bash
+
+      # Cross-linking to ARM64 needs the matching MSVC lib/include paths on
+      # PATH/LIB/INCLUDE, which the default x64 dev environment doesn't set
+      # up by itself.
+      - name: Set up MSVC ARM64 cross-compilation environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-arm64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binary
+        run: cargo build --release --target aarch64-pc-windows-msvc
+        shell: bash
+        # NOTE: unverified in CI as of this writing -- this is the first
+        # ARM64 build of this project. rustls' `ring` crypto backend is the
+        # main risk (it needs working aarch64-pc-windows-msvc assembly
+        # support); if this step fails on `ring`, the fix is switching
+        # ureq's TLS feature from "rustls" to "native-tls" in Cargo.toml
+        # (uses Windows' built-in schannel, no external crypto build step).
+
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target/aarch64-pc-windows-msvc/release/wtop.exe dist/wtop-arm64.exe
+          Compress-Archive -Path target/aarch64-pc-windows-msvc/release/wtop.exe -DestinationPath "dist/wtop-${{ github.ref_name }}-aarch64-pc-windows-msvc.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-arm64
+          path: dist/*
+          retention-days: 1
+
+  publish:
+    needs: [build-x64, build-arm64]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,6 +1,8 @@
-use std::mem;
-use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX, GetTickCount64};
 use crate::model::MemoryData;
+use std::mem;
+use windows_sys::Win32::System::SystemInformation::{
+    GetTickCount64, GlobalMemoryStatusEx, MEMORYSTATUSEX,
+};
 
 pub struct MemoryCollector {
     history: Vec<f64>,

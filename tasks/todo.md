@@ -1,74 +1,92 @@
-# wtop - Development Plan & Progress
+# wtop - Quality Pass, Responsive Titles, CI/CD + Self-Update
 
-Resource monitor TUI for Windows with btop-level aesthetics and minimal resource footprint.
+Plan: C:\Users\Gabs\.claude\plans\sorted-watching-hippo.md
 
-## Status: Planning & Tech Stack Discussion
+## Workstream A - Code quality + responsive truncation [DONE]
+- [x] `src/ui/text.rs` - shared `truncate`, `draw_str`, `draw_str_with` helpers
+- [x] Register `pub mod text;` in `src/ui/mod.rs`
+- [x] `header.rs` - use text helpers for logo/uptime/badges
+- [x] `cpu_panel.rs` - content-aware title truncation, use text helpers (fixes `lx` counter lint)
+- [x] `mem_disk_panel.rs` - use text helpers, `.enumerate()` for partitions (fixes `cur_y` counter lint)
+- [x] `net_gpu_panel.rs` - content-aware GPU name + NET iface truncation (THE bug fix), use text helpers
+- [x] `proc_panel.rs` - `ProcPanelView` struct (fixes too_many_arguments), use text helpers, delete local `truncate_str`
+- [x] `help_modal.rs` - use text helpers, add `u` shortcut row
+- [x] `layout.rs` - update proc panel call site to use `ProcPanelView`
+- [x] `app.rs:68` - collapsible_match fix
+- [x] `collectors/cpu.rs`, `collectors/gpu.rs` - c"" string literals (+ `.cast()`)
+- [x] `config.rs` - let-chain collapses in load()/save()
+- [x] `braille.rs` - saturating_sub fix
+- [x] `README.md` - add `u` keybinding row
+- [x] whole-project `cargo fmt` (codebase wasn't fmt-clean before this work either; needed so CI's fmt gate is meaningful from day one)
+- [x] `cargo clippy --release --all-targets` -> 0 warnings (confirmed)
+- [x] `cargo fmt -- --check` -> clean (confirmed)
+- [x] `cargo test` passes (13/13)
+- [x] `cargo build --release` succeeds
 
----
+## Workstream B - Self-update [DONE]
+- [x] B.0 risk spike: ureq+rustls links fine against MSYS2 UCRT64 GCC, no native-tls fallback needed
+- [x] `src/updater.rs` - ReleaseInfo, UpdateStatus, spawn_check, is_newer, spawn_apply_update, cleanup_previous_update
+- [x] `mod updater;` in main.rs
+- [x] `app.rs` - AppState fields (update_status, pending_update_confirm, update_confirmed), `u` keybinding, confirm block
+- [x] `main.rs` - Arc<Mutex<UpdateStatus>>, cleanup + spawn_check at startup, per-frame sync, apply/relaunch routing
+- [x] `header.rs` - update badge states (Idle/Error render nothing)
+- [x] `src/ui/update_modal.rs` - confirm dialog
+- [x] `layout.rs` - render update modal
+- [x] Unit tests: `text::truncate`, `updater::is_newer`, PE-verify, rename-dance in temp_dir, net_gpu_panel regression test proving throughput never gets cut off
+- [x] `[profile.release]` (lto, strip, codegen-units=1, panic=abort) - binary is 2.24MB, SMALLER than pre-feature 2.6MB baseline
+- [x] `cargo build --release` + `cargo clippy -D warnings` + `cargo fmt --check` + `cargo test` all clean (19/19 tests)
+- [x] Binary smoke-tested (starts, renders, updater thread doesn't block/crash, no lingering process)
+- [ ] Manual resize test in a real terminal - NOT done (no interactive TTY available in this environment); covered instead by the automated net_gpu_panel regression test + cpu_title unit tests, which assert the same invariant more rigorously than eyeballing
 
-### Phase 1: Tech Stack & Architectural Assessment
-- [x] Present comprehensive tech stack analysis (Go vs Rust vs C++ vs C#) focusing on Windows performance, memory footprint, and TUI ecosystem
-- [x] Confirm tech stack choice with user (User chose: **Rust**)
-- [x] Establish benchmark targets: RAM < 25MB, CPU usage < 0.5% during active monitoring
-- [x] Configure Rust toolchain (`stable-x86_64-pc-windows-gnu` linked with UCRT64 GCC)
+## Workstream C - CI/CD [DONE]
+- [x] `.github/workflows/ci.yml` (fmt, clippy -D warnings, build, test on push/PR to master)
+- [x] `.github/workflows/release.yml` (tag v*.*.* trigger, version guard, GNU/MSYS2 setup, bare wtop.exe + zip asset, softprops/action-gh-release)
+- [x] YAML syntax validated (python yaml.safe_load on both files)
+- [x] Exact rustup command from workflows dry-verified locally
+- [ ] Not pushed/triggered - deliberately left for the user to trigger (tag push / release is a shared, irreversible action)
 
-### Phase 2: Project Setup & Core Architecture
-- [x] Initialize repository structure and build configuration (Cargo + ratatui + crossterm + windows-sys)
-- [x] Design concurrent architecture (dedicated background collector worker, atomic/channel metric exchange, decoupled 60fps/event-driven TUI render loop)
-- [x] Implement configuration manager (configurable sampling interval, default theme, persistent settings in `config.rs`)
+## Review section
 
-### Phase 3: Low-Overhead Windows Metric Collectors
-- [x] **CPU Collector**: Per-core and total utilization via `NtQuerySystemInformation` + brand name via CPUID
-- [x] **Memory Collector**: Physical RAM used/available, Commit/Swap, uptime via `GlobalMemoryStatusEx` and `GetTickCount64`
-- [x] **Disk IO Collector**: Read/Write throughput (MB/s) and free space per drive via `GetLogicalDriveStringsW` / `GetDiskFreeSpaceExW` / `PdhAddEnglishCounterW`
-- [x] **GPU Collector**: 3D/Compute utilization & Dedicated VRAM via Windows PDH English counters (`\GPU Engine(*)\Utilization Percentage`) + adapter name via `EnumDisplayDevicesW`
-- [x] **Network Collector**: Real-time Download/Upload bandwidth & interface stats via `GetIfTable2` (`iphlpapi.dll`)
-- [x] **Process Collector**: Fast process enumeration via `CreateToolhelp32Snapshot`, retrieving PID, name, CPU %, RSS memory, threads, with kill capability and sorting
+All three workstreams complete. Final state: `cargo build --release --all-targets`,
+`cargo clippy --release --all-targets -- -D warnings`, `cargo fmt -- --check`, and
+`cargo test --release` (19/19) all clean. Binary smoke-tested (starts, renders, updater
+thread doesn't block/crash, no lingering process). Release binary is 2.24MB — smaller
+than the pre-work 2.6MB baseline, despite adding the full self-update stack (ureq +
+rustls), thanks to `[profile.release]` lto/strip/codegen-units=1/panic=abort.
 
-### Phase 4: TUI Presentation & Aesthetic Engine
-- [x] Implement high-performance terminal backend with Windows Virtual Terminal Processing (VT100 / 24-bit TrueColor)
-- [x] Implement braille graph engine (`⠋`, `⣀`, `⣰`, etc.) for sub-pixel high-density visual telemetry identical to btop
-- [x] Implement Dark and Light themes with 24-bit RGB gradients, stylish borders, and color ramps
-- [x] Build responsive layout: CPU box, Memory & Disk box, Network & GPU box, and Process table box
+Deviations from the original plan, both improvements made along the way:
+1. The whole codebase wasn't `rustfmt`-clean before this work (pre-existing, unrelated
+   to these changes). Ran a project-wide `cargo fmt` so the new CI `fmt --check` gate
+   is meaningful from day one, not immediately red on files nobody touched.
+2. Added `[profile.release]` (not in the original plan) once the self-update
+   dependencies visibly grew the binary from 2.6MB to 6.4MB — this was a legitimate
+   "minimal footprint" concern worth addressing given the project's stated value prop,
+   and it more than recovered the size.
 
-### Phase 5: User Interaction & Controls
-- [x] Keyboard navigation (Arrow keys / Vim keys `hjkl`, Tab between panes)
-- [x] Process management: interactive sorting (by CPU, MEM, PID, Name), search/filter (`/`), and termination (`x` / `Delete`)
-- [x] Dynamic sampling rate adjustment (shortcuts `+` / `-`)
-- [x] Theme switching shortcut (`t` toggle Dark/Light)
-- [x] Help dialog / overlay (`?` or `h`)
+Not done, deliberately: no tag was pushed and no GitHub Release was triggered — that's
+a shared/irreversible action left for the user. The self-updater's full happy path
+(real GitHub API response, badge, download, swap, relaunch) is inert until a real
+release exists and can only be exercised once the first tag is published.
 
-### Phase 6: Verification & Profiling
-- [x] Verify zero-leak memory footprint: **18.08 MB RAM Working Set** (Target < 25MB achieved)
-- [x] Verify low CPU footprint: **~0.05% CPU usage** (0.31s CPU time across 5000ms run, Target < 0.5% achieved)
-- [x] Verify flicker-free rendering on Windows Terminal via double-buffering
-- [x] Verify light theme readability and dark theme contrast
-- [x] Test graceful shutdown, panic hook, and terminal state restoration
-- [x] Unit test suite passing: 5/5 tests passed in `cargo test`
-
-### Phase 7: Review Section & Documentation
-- [x] Document final architecture, performance benchmarks, and user instructions in `README.md`
-- [x] Review adherence to workflow.md and lessons learned
-
----
-
-## Final Review Section
-
-### Summary of Accomplishments
-1. **Tech Stack & Toolchain**: Implemented pure Rust using `ratatui 0.29`, `crossterm 0.28`, and low-level `windows-sys 0.59`. Compiled using `stable-x86_64-pc-windows-gnu` linked with MSYS2 UCRT64 GCC, producing a single static 2.6MB `.exe`.
-2. **Zero-WMI Architecture**:
-   - CPU: `NtQuerySystemInformation` (SystemProcessorPerformanceInformation) for microsecond per-core resolution + CPUID for hardware model name.
-   - Memory: `GlobalMemoryStatusEx` + `GetTickCount64`.
-   - Disks & IO: `GetLogicalDriveStringsW` + `GetDiskFreeSpaceExW` for partition volumes, and native PDH English counters for real-time read/write throughput.
-   - GPU: Windows WDDM PDH counters (`\GPU Engine(*)\Utilization Percentage`) + Dedicated VRAM + `EnumDisplayDevicesW`.
-   - Network: `GetIfTable2` (`iphlpapi.dll`) querying active physical interfaces for bandwidth and totals.
-   - Processes: `CreateToolhelp32Snapshot` with `PROCESS_QUERY_LIMITED_INFORMATION`, computing delta CPU %, memory working set, live filter search, and termination.
-3. **Aesthetics & UX**:
-   - Sub-pixel Braille curve rendering (2x4 dots per character cell).
-   - Dynamic TrueColor 24-bit RGB gradients (green -> amber -> red for loads, teal/orange for network).
-   - Instant switching between Dark and Light themes with persistent configuration in `%APPDATA%\wtop\config.json`.
-   - Dynamic sampling interval cycling (`250ms`, `500ms`, `1000ms`, `2000ms`, `5000ms`).
-4. **Empirical Benchmarks**:
-   - **RAM Working Set**: 18.08 MB (well below the 25MB target).
-   - **CPU Overhead**: ~0.05% (well below the 0.5% target).
-   - **Binary Size**: 2.6 MB (standalone executable).
+## Workstream D - ARM64 support [DONE, unverified in real CI]
+- [x] `src/updater.rs` - `ASSET_NAME` is now `cfg(target_arch)`-gated: `wtop.exe` on
+      x86_64, `wtop-arm64.exe` on aarch64 — picked by the binary's own compiled
+      target, not the host OS, so an x64 build under ARM64 emulation still updates
+      itself as x64
+- [x] `.github/workflows/release.yml` restructured: `check-version` (shared tag/version
+      guard) -> `build-x64` (unchanged GNU/MSYS2 path) + `build-arm64` (new: MSVC-host
+      toolchain, `rustup target add aarch64-pc-windows-msvc`, `ilammy/msvc-dev-cmd`
+      for the ARM64 cross-linker environment) -> `publish` (downloads both artifacts,
+      single `softprops/action-gh-release` call, avoids a two-job race on release
+      creation)
+- [x] `README.md` - new "Piattaforme Supportate" section documenting both assets
+- [x] YAML syntax validated (python yaml.safe_load)
+- [x] `cargo fmt --check` / `cargo clippy -D warnings` / `cargo test --release` (19/19)
+      / `cargo build --release` all clean after the updater.rs change; x86_64 binary
+      size unaffected (still 2.24MB)
+- [ ] **Not verified**: the actual `aarch64-pc-windows-msvc` cross-build has never run
+      (no ARM64/MSVC cross toolchain available locally). Main risk: rustls' `ring`
+      crypto backend needs working aarch64-pc-windows-msvc assembly support — if the
+      `build-arm64` job fails on `ring`, documented fallback is switching ureq's `rustls`
+      feature to `native-tls` in `Cargo.toml`. This will only be provable on the first
+      real tag push.

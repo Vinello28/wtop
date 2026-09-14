@@ -1,19 +1,19 @@
 pub mod cpu;
-pub mod memory;
-pub mod io;
 pub mod gpu;
+pub mod io;
+pub mod memory;
 pub mod network;
 pub mod process;
 
-use std::time::Instant;
-use crate::config::AppConfig;
-use crate::model::SystemSnapshot;
 use self::cpu::CpuCollector;
-use self::memory::MemoryCollector;
-use self::io::IoCollector;
 use self::gpu::GpuCollector;
+use self::io::IoCollector;
+use self::memory::MemoryCollector;
 use self::network::NetworkCollector;
 use self::process::ProcessCollector;
+use crate::config::AppConfig;
+use crate::model::SystemSnapshot;
+use std::time::Instant;
 
 pub struct SystemCollector {
     cpu: CpuCollector,
@@ -47,7 +47,9 @@ impl SystemCollector {
         let io_data = self.io.collect();
         let gpu_data = self.gpu.collect();
         let net_data = self.net.collect();
-        let processes = self.proc.collect(config.proc_sort_by, config.proc_sort_desc, filter);
+        let processes = self
+            .proc
+            .collect(config.proc_sort_by, config.proc_sort_desc, filter);
 
         SystemSnapshot {
             timestamp,

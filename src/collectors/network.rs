@@ -1,6 +1,6 @@
+use crate::model::NetworkData;
 use std::time::Instant;
 use windows_sys::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, MIB_IF_TABLE2};
-use crate::model::NetworkData;
 
 pub struct NetworkCollector {
     prev_rx_total: u64,
@@ -49,8 +49,14 @@ impl NetworkCollector {
                         let sum = rx + tx;
                         if sum > max_traffic {
                             max_traffic = sum;
-                            let desc_len = row.Description.iter().position(|&c| c == 0).unwrap_or(row.Description.len());
-                            let desc = String::from_utf16_lossy(&row.Description[..desc_len]).trim().to_string();
+                            let desc_len = row
+                                .Description
+                                .iter()
+                                .position(|&c| c == 0)
+                                .unwrap_or(row.Description.len());
+                            let desc = String::from_utf16_lossy(&row.Description[..desc_len])
+                                .trim()
+                                .to_string();
                             if !desc.is_empty() {
                                 best_iface = desc;
                             }

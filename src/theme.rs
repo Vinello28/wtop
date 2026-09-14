@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use ratatui::style::{Color, Modifier, Style};
 use crate::config::ThemeMode;
+use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -12,24 +12,24 @@ pub struct Theme {
     pub text_main: Color,
     pub text_dim: Color,
     pub text_highlight: Color,
-    
+
     // Module specific accents
     pub cpu_low: Color,
     pub cpu_mid: Color,
     pub cpu_high: Color,
-    
+
     pub mem_primary: Color,
     pub mem_secondary: Color,
-    
+
     pub gpu_primary: Color,
     pub gpu_secondary: Color,
-    
+
     pub net_rx: Color,
     pub net_tx: Color,
-    
+
     pub disk_read: Color,
     pub disk_write: Color,
-    
+
     pub proc_header_bg: Color,
     pub proc_selected_bg: Color,
     pub proc_selected_fg: Color,
@@ -46,18 +46,18 @@ impl Theme {
             text_dim: Color::Rgb(115, 130, 155),
             text_highlight: Color::Rgb(255, 255, 255),
 
-            cpu_low: Color::Rgb(52, 211, 153),    // Emerald
+            cpu_low: Color::Rgb(52, 211, 153),   // Emerald
             cpu_mid: Color::Rgb(251, 191, 36),   // Amber
             cpu_high: Color::Rgb(248, 113, 113), // Coral Red
 
-            mem_primary: Color::Rgb(56, 189, 248),  // Sky blue
+            mem_primary: Color::Rgb(56, 189, 248),   // Sky blue
             mem_secondary: Color::Rgb(168, 85, 247), // Purple
 
-            gpu_primary: Color::Rgb(217, 70, 239),  // Fuchsia
+            gpu_primary: Color::Rgb(217, 70, 239),    // Fuchsia
             gpu_secondary: Color::Rgb(244, 114, 182), // Rose
 
-            net_rx: Color::Rgb(45, 212, 191),   // Teal
-            net_tx: Color::Rgb(251, 146, 60),   // Orange
+            net_rx: Color::Rgb(45, 212, 191), // Teal
+            net_tx: Color::Rgb(251, 146, 60), // Orange
 
             disk_read: Color::Rgb(96, 165, 250), // Blue
             disk_write: Color::Rgb(244, 63, 94), // Rose red
@@ -78,20 +78,20 @@ impl Theme {
             text_dim: Color::Rgb(100, 116, 139),
             text_highlight: Color::Rgb(15, 23, 42),
 
-            cpu_low: Color::Rgb(22, 163, 74),    // Green
-            cpu_mid: Color::Rgb(217, 119, 6),    // Amber
-            cpu_high: Color::Rgb(220, 38, 38),   // Crimson
+            cpu_low: Color::Rgb(22, 163, 74),  // Green
+            cpu_mid: Color::Rgb(217, 119, 6),  // Amber
+            cpu_high: Color::Rgb(220, 38, 38), // Crimson
 
-            mem_primary: Color::Rgb(2, 132, 199),   // Deep sky blue
+            mem_primary: Color::Rgb(2, 132, 199), // Deep sky blue
             mem_secondary: Color::Rgb(124, 58, 237), // Indigo
 
             gpu_primary: Color::Rgb(147, 51, 234),  // Purple
             gpu_secondary: Color::Rgb(190, 24, 93), // Pink
 
-            net_rx: Color::Rgb(13, 148, 136),   // Deep teal
-            net_tx: Color::Rgb(194, 65, 12),    // Rust
+            net_rx: Color::Rgb(13, 148, 136), // Deep teal
+            net_tx: Color::Rgb(194, 65, 12),  // Rust
 
-            disk_read: Color::Rgb(37, 99, 235), // Royal blue
+            disk_read: Color::Rgb(37, 99, 235),  // Royal blue
             disk_write: Color::Rgb(185, 28, 28), // Deep red
 
             proc_header_bg: Color::Rgb(226, 232, 240),
@@ -120,7 +120,9 @@ impl Theme {
 
     pub fn block_border_style(&self, focused: bool) -> Style {
         if focused {
-            Style::default().fg(self.border_focused).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(self.border_focused)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(self.border_normal)
         }
@@ -128,7 +130,9 @@ impl Theme {
 
     pub fn block_title_style(&self, focused: bool) -> Style {
         if focused {
-            Style::default().fg(self.title_focused).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(self.title_focused)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(self.text_dim)
         }

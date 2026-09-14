@@ -1,28 +1,23 @@
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, BorderType, Widget};
 use crate::model::CpuData;
 use crate::theme::Theme;
 use crate::ui::braille::BrailleChart;
 use crate::ui::gauge::render_mini_bar;
+use crate::ui::text::{draw_str, truncate};
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
-pub fn render_cpu_panel(
-    buf: &mut Buffer,
-    area: Rect,
-    cpu: &CpuData,
-    theme: &Theme,
-    focused: bool,
-) {
+/// Chars taken by the fixed `" CPU:  "` title frame (leading space, "CPU:",
+/// two spaces, trailing space) around the variable-length model name.
+const TITLE_FRAME_LEN: usize = 7;
+
+pub fn render_cpu_panel(buf: &mut Buffer, area: Rect, cpu: &CpuData, theme: &Theme, focused: bool) {
     if area.width < 10 || area.height < 4 {
         return;
     }
 
-    let title = if cpu.model_name.is_empty() {
-        " CPU ".to_string()
-    } else {
-        format!(" CPU: {} ", cpu.model_name)
-    };
+    let title = cpu_title(&cpu.model_name, area.width);
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -57,15 +52,16 @@ pub fn render_cpu_panel(
         // Line 0: Global summary text
         let usage_color = theme.usage_color(cpu.global_pct);
         let summary_text = format!("Total: {:5.1}%", cpu.global_pct);
-        let mut x = left.x;
-        for ch in summary_text.chars() {
-            if x < left.right() {
-                buf[(x, left.y)]
-                    .set_char(ch)
-                    .set_style(Style::default().fg(usage_color).add_modifier(Modifier::BOLD));
-                x += 1;
-            }
-        }
+        draw_str(
+            buf,
+            left.x,
+            left.y,
+            left.right(),
+            &summary_text,
+            Style::default()
+                .fg(usage_color)
+                .add_modifier(Modifier::BOLD),
+        );
 
         // Braille Chart below summary
         let chart_area = Rect {
@@ -103,11 +99,14 @@ pub fn render_cpu_panel(
 
                 if y < right.bottom() && x + col_width <= right.right() + 1 {
                     let label = format!("{:02}:", core.id);
-                    let mut lx = x;
-                    for ch in label.chars() {
-                        buf[(lx, y)].set_char(ch).set_style(Style::default().fg(theme.text_dim));
-                        lx += 1;
-                    }
+                    draw_str(
+                        buf,
+                        x,
+                        y,
+                        right.right(),
+                        &label,
+                        Style::default().fg(theme.text_dim),
+                    );
 
                     let bar_area = Rect {
                         x: x + 4,
@@ -118,16 +117,61 @@ pub fn render_cpu_panel(
                     render_mini_bar(buf, bar_area, core.usage_pct, theme, '·');
 
                     let pct_str = format!("{:3.0}%", core.usage_pct);
-                    let mut px = x + 11;
                     let color = theme.usage_color(core.usage_pct);
-                    for ch in pct_str.chars() {
-                        if px < right.right() {
-                            buf[(px, y)].set_char(ch).set_style(Style::default().fg(color));
-                            px += 1;
-                        }
-                    }
+                    draw_str(
+                        buf,
+                        x + 11,
+                        y,
+                        right.right(),
+                        &pct_str,
+                        Style::default().fg(color),
+                    );
                 }
             }
         }
+    }
+}
+
+/// Builds the CPU panel's block title, truncating `model_name` to fit the
+/// available border width with an ellipsis rather than letting ratatui
+/// silently clip it. Falls back to a bare " CPU " title when the panel is
+/// too narrow to show a meaningful fragment of the name.
+fn cpu_title(model_name: &str, area_width: u16) -> String {
+    if model_name.is_empty() {
+        return " CPU ".to_string();
+    }
+    let avail = area_width.saturating_sub(2) as usize; // inside the left/right border
+    let name_budget = avail.saturating_sub(TITLE_FRAME_LEN);
+    if name_budget < 4 {
+        return " CPU ".to_string();
+    }
+    format!(" CPU: {} ", truncate(model_name, name_budget))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cpu_title_fits_full_name() {
+        assert_eq!(cpu_title("Ryzen 9", 30), " CPU: Ryzen 9 ");
+    }
+
+    #[test]
+    fn cpu_title_truncates_long_name() {
+        let title = cpu_title("AMD Ryzen 9 7950X 16-Core Processor", 25);
+        assert!(title.starts_with(" CPU: "));
+        assert!(title.contains('…'));
+        assert!(title.chars().count() as u16 <= 25);
+    }
+
+    #[test]
+    fn cpu_title_falls_back_when_too_narrow() {
+        assert_eq!(cpu_title("Ryzen 9", 10), " CPU ");
+    }
+
+    #[test]
+    fn cpu_title_empty_name() {
+        assert_eq!(cpu_title("", 30), " CPU ");
     }
 }

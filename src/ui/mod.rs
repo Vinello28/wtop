@@ -1,9 +1,11 @@
 pub mod braille;
+pub mod cpu_panel;
 pub mod gauge;
 pub mod header;
-pub mod cpu_panel;
+pub mod help_modal;
+pub mod layout;
 pub mod mem_disk_panel;
 pub mod net_gpu_panel;
 pub mod proc_panel;
-pub mod help_modal;
-pub mod layout;
+pub mod text;
+pub mod update_modal;

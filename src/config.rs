@@ -46,21 +46,20 @@ impl AppConfig {
     }
 
     pub fn load() -> Self {
-        if let Some(path) = Self::config_path() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
-                    return cfg;
-                }
-            }
+        if let Some(path) = Self::config_path()
+            && let Ok(content) = fs::read_to_string(&path)
+            && let Ok(cfg) = serde_json::from_str::<AppConfig>(&content)
+        {
+            return cfg;
         }
         Self::default()
     }
 
     pub fn save(&self) {
-        if let Some(path) = Self::config_path() {
-            if let Ok(content) = serde_json::to_string_pretty(self) {
-                let _ = fs::write(path, content);
-            }
+        if let Some(path) = Self::config_path()
+            && let Ok(content) = serde_json::to_string_pretty(self)
+        {
+            let _ = fs::write(path, content);
         }
     }
 

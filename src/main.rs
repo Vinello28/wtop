@@ -4,25 +4,27 @@ mod config;
 mod model;
 mod theme;
 mod ui;
+mod updater;
 
-use std::io::{stdout, Result};
+use std::io::{Result, stdout};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 
 use crate::app::AppState;
 use crate::collectors::SystemCollector;
 use crate::config::AppConfig;
 use crate::theme::Theme;
+use crate::updater::UpdateStatus;
 
 fn setup_panic_hook() {
     let original_hook = std::panic::take_hook();
@@ -48,6 +50,12 @@ fn main() -> Result<()> {
     let sampling_rate = Arc::new(AtomicU64::new(config.sampling_rate_ms));
     let is_running = Arc::new(AtomicBool::new(true));
     let filter_query = Arc::new(Mutex::new(String::new()));
+
+    // Self-update: a genuine one-shot check, never part of the recurring
+    // sampling loop below.
+    let update_status = Arc::new(Mutex::new(UpdateStatus::default()));
+    updater::cleanup_previous_update();
+    updater::spawn_check(Arc::clone(&update_status));
 
     // Metrics channel: background worker -> UI thread
     let (tx_snapshot, rx_snapshot) = mpsc::sync_channel(2);
@@ -84,7 +92,9 @@ fn main() -> Result<()> {
                     let sleep_time = target - elapsed;
                     // Sleep in small increments to be responsive to quit or rate changes
                     let mut remaining = sleep_time;
-                    while remaining > Duration::from_millis(50) && bg_running.load(Ordering::Relaxed) {
+                    while remaining > Duration::from_millis(50)
+                        && bg_running.load(Ordering::Relaxed)
+                    {
                         thread::sleep(Duration::from_millis(50));
                         remaining = remaining.saturating_sub(Duration::from_millis(50));
                     }
@@ -122,6 +132,24 @@ fn main() -> Result<()> {
             if *guard != state.proc_filter {
                 *guard = state.proc_filter.clone();
             }
+        }
+
+        // Mirror the update status down from the background checker/applier,
+        // and act on a confirmed apply request.
+        if let Ok(guard) = update_status.lock() {
+            state.update_status = guard.clone();
+        }
+        if state.update_confirmed {
+            state.update_confirmed = false;
+            if let UpdateStatus::Available(info) = state.update_status.clone() {
+                updater::spawn_apply_update(info, Arc::clone(&update_status));
+            }
+        }
+        if matches!(state.update_status, UpdateStatus::Ready) {
+            // The new version has been swapped in and relaunched; let the
+            // existing shutdown path run so the terminal is left sane
+            // before this process exits.
+            state.should_quit = true;
         }
 
         // Render frame

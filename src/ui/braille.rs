@@ -1,8 +1,8 @@
+use crate::theme::interpolate_color;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
-use crate::theme::interpolate_color;
 
 pub struct BrailleChart<'a> {
     data: &'a [f64],
@@ -45,11 +45,7 @@ impl<'a> Widget for BrailleChart<'a> {
         let mut samples = vec![0.0; num_sub_cols];
         let data_len = self.data.len();
         if data_len > 0 {
-            let start = if data_len >= num_sub_cols {
-                data_len - num_sub_cols
-            } else {
-                0
-            };
+            let start = data_len.saturating_sub(num_sub_cols);
             let slice = &self.data[start..];
             let offset = num_sub_cols.saturating_sub(slice.len());
             for (i, &val) in slice.iter().enumerate() {
@@ -99,13 +95,15 @@ impl<'a> Widget for BrailleChart<'a> {
                         dot_sub_row <= left_h
                     } else {
                         // Outline/line only
-                        dot_sub_row == left_h || (dot_idx == 0 && dot_sub_row <= left_h && left_h > 0)
+                        dot_sub_row == left_h
+                            || (dot_idx == 0 && dot_sub_row <= left_h && left_h > 0)
                     };
 
                     let right_active = if self.filled {
                         dot_sub_row <= right_h
                     } else {
-                        dot_sub_row == right_h || (dot_idx == 0 && dot_sub_row <= right_h && right_h > 0)
+                        dot_sub_row == right_h
+                            || (dot_idx == 0 && dot_sub_row <= right_h && right_h > 0)
                     };
 
                     if left_active {

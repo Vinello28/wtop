@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use the same GNU *host* toolchain (not an MSVC host with a GNU
+      # cross-target) as local development, so `cargo build` with no
+      # --target flag lands on x86_64-pc-windows-gnu and the linker path
+      # hardcoded in .cargo/config.toml applies unmodified.
+      - name: Install GNU-host Rust toolchain
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal --component clippy,rustfmt
+          rustup default stable-x86_64-pc-windows-gnu
+        shell: bash
+
+      # Installs to C:\msys64 by default, matching .cargo/config.toml's
+      # hardcoded linker/ar paths.
+      - name: Set up MSYS2 UCRT64 (GCC toolchain)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          update: true
+
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+        shell: bash
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --release --all-targets -- -D warnings
+        shell: bash
+
+      - name: Build
+        run: cargo build --release --all-targets
+        shell: bash
+
+      - name: Test
+        run: cargo test --release
+        shell: bash

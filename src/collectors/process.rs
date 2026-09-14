@@ -1,17 +1,17 @@
+use crate::config::ProcessSortBy;
+use crate::model::ProcessItem;
 use std::collections::HashMap;
 use std::mem;
 use std::time::Instant;
 use windows_sys::Win32::Foundation::CloseHandle;
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
 };
 use windows_sys::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows_sys::Win32::System::Threading::{
-    GetProcessTimes, OpenProcess, TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    PROCESS_TERMINATE,
+    GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    TerminateProcess,
 };
-use crate::config::ProcessSortBy;
-use crate::model::ProcessItem;
 
 pub struct ProcessCollector {
     prev_times: HashMap<u32, (u64, Instant)>,
@@ -26,7 +26,12 @@ impl ProcessCollector {
         }
     }
 
-    pub fn collect(&mut self, sort_by: ProcessSortBy, desc: bool, filter: &str) -> Vec<ProcessItem> {
+    pub fn collect(
+        &mut self,
+        sort_by: ProcessSortBy,
+        desc: bool,
+        filter: &str,
+    ) -> Vec<ProcessItem> {
         let now = Instant::now();
         let mut processes = Vec::with_capacity(256);
         let mut seen_pids = HashMap::new();
@@ -43,7 +48,11 @@ impl ProcessCollector {
             if Process32FirstW(snapshot, &mut entry) != 0 {
                 loop {
                     let pid = entry.th32ProcessID;
-                    let name_len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
+                    let name_len = entry
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(entry.szExeFile.len());
                     let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]);
 
                     // Skip System Idle Process (PID 0)
@@ -63,17 +72,30 @@ impl ProcessCollector {
                             let mut exit = mem::zeroed();
                             let mut kernel = mem::zeroed();
                             let mut user = mem::zeroed();
-                            if GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user) != 0 {
-                                let k_time = (kernel.dwLowDateTime as u64) | ((kernel.dwHighDateTime as u64) << 32);
-                                let u_time = (user.dwLowDateTime as u64) | ((user.dwHighDateTime as u64) << 32);
+                            if GetProcessTimes(
+                                handle,
+                                &mut creation,
+                                &mut exit,
+                                &mut kernel,
+                                &mut user,
+                            ) != 0
+                            {
+                                let k_time = (kernel.dwLowDateTime as u64)
+                                    | ((kernel.dwHighDateTime as u64) << 32);
+                                let u_time = (user.dwLowDateTime as u64)
+                                    | ((user.dwHighDateTime as u64) << 32);
                                 let total_time_100ns = k_time + u_time;
 
-                                if let Some(&(prev_time_100ns, prev_instant)) = self.prev_times.get(&pid) {
+                                if let Some(&(prev_time_100ns, prev_instant)) =
+                                    self.prev_times.get(&pid)
+                                {
                                     let dt = now.duration_since(prev_instant).as_secs_f64();
                                     if dt > 0.05 && total_time_100ns >= prev_time_100ns {
                                         let delta_proc_100ns = total_time_100ns - prev_time_100ns;
                                         let delta_wall_100ns = dt * 10_000_000.0;
-                                        let raw_pct = (delta_proc_100ns as f64 / delta_wall_100ns) * 100.0 / (self.num_cores as f64);
+                                        let raw_pct = (delta_proc_100ns as f64 / delta_wall_100ns)
+                                            * 100.0
+                                            / (self.num_cores as f64);
                                         cpu_pct = raw_pct.clamp(0.0, 100.0) as f32;
                                     }
                                 }
@@ -118,9 +140,13 @@ impl ProcessCollector {
             ProcessSortBy::Cpu => {
                 processes.sort_by(|a, b| {
                     if desc {
-                        b.cpu_pct.partial_cmp(&a.cpu_pct).unwrap_or(std::cmp::Ordering::Equal)
+                        b.cpu_pct
+                            .partial_cmp(&a.cpu_pct)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     } else {
-                        a.cpu_pct.partial_cmp(&b.cpu_pct).unwrap_or(std::cmp::Ordering::Equal)
+                        a.cpu_pct
+                            .partial_cmp(&b.cpu_pct)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     }
                 });
             }

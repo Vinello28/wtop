@@ -1,7 +1,8 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use crate::collectors::process::ProcessCollector;
 use crate::config::{AppConfig, ProcessSortBy, ThemeMode};
 use crate::model::SystemSnapshot;
+use crate::updater::UpdateStatus;
+use crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivePanel {
@@ -22,6 +23,9 @@ pub struct AppState {
     pub pending_kill: Option<u32>,
     pub show_help: bool,
     pub should_quit: bool,
+    pub update_status: UpdateStatus,
+    pub pending_update_confirm: bool,
+    pub update_confirmed: bool,
 }
 
 impl AppState {
@@ -37,6 +41,9 @@ impl AppState {
             pending_kill: None,
             show_help: false,
             should_quit: false,
+            update_status: UpdateStatus::default(),
+            pending_update_confirm: false,
+            update_confirmed: false,
         }
     }
 
@@ -64,12 +71,10 @@ impl AppState {
                     self.proc_selected_idx = 0;
                     self.proc_scroll_offset = 0;
                 }
-                KeyCode::Char(c) => {
-                    if !c.is_control() {
-                        self.proc_filter.push(c);
-                        self.proc_selected_idx = 0;
-                        self.proc_scroll_offset = 0;
-                    }
+                KeyCode::Char(c) if !c.is_control() => {
+                    self.proc_filter.push(c);
+                    self.proc_selected_idx = 0;
+                    self.proc_scroll_offset = 0;
                 }
                 _ => {}
             }
@@ -91,7 +96,22 @@ impl AppState {
             return;
         }
 
-        // 3. Help Modal Mode
+        // 3. Update Confirmation Prompt Mode
+        if self.pending_update_confirm {
+            match key.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    self.pending_update_confirm = false;
+                    self.update_confirmed = true;
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.pending_update_confirm = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        // 4. Help Modal Mode
         if self.show_help {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Char('q') => {
@@ -102,13 +122,18 @@ impl AppState {
             return;
         }
 
-        // 4. Standard Navigation & Shortcuts
+        // 5. Standard Navigation & Shortcuts
         match key.code {
             KeyCode::Char('q') => {
                 self.should_quit = true;
             }
             KeyCode::Char('?') | KeyCode::Char('h') => {
                 self.show_help = true;
+            }
+            KeyCode::Char('u') => {
+                if matches!(self.update_status, UpdateStatus::Available(_)) {
+                    self.pending_update_confirm = true;
+                }
             }
             KeyCode::Char('t') => {
                 self.config.theme = match self.config.theme {
@@ -138,7 +163,9 @@ impl AppState {
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if !self.snapshot.processes.is_empty() && self.proc_selected_idx + 1 < self.snapshot.processes.len() {
+                if !self.snapshot.processes.is_empty()
+                    && self.proc_selected_idx + 1 < self.snapshot.processes.len()
+                {
                     self.proc_selected_idx += 1;
                     self.adjust_proc_scroll(20);
                 }
@@ -149,7 +176,8 @@ impl AppState {
             }
             KeyCode::PageDown => {
                 if !self.snapshot.processes.is_empty() {
-                    self.proc_selected_idx = (self.proc_selected_idx + 10).min(self.snapshot.processes.len() - 1);
+                    self.proc_selected_idx =
+                        (self.proc_selected_idx + 10).min(self.snapshot.processes.len() - 1);
                     self.adjust_proc_scroll(20);
                 }
             }
