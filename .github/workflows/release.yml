@@ -135,11 +135,16 @@ jobs:
 
       # Cross-linking to ARM64 needs the matching MSVC lib/include paths on
       # PATH/LIB/INCLUDE, which the default x64 dev environment doesn't set
-      # up by itself.
+      # up by itself. `arch: amd64_arm64` (not bare "arm64") is the
+      # cross-compilation form: host=amd64/x64, target=arm64 -- plain "arm64"
+      # asks vcvarsall for a *native* ARM64 toolchain, which doesn't exist on
+      # this x64 runner, so it fails to wire up PATH/LIB/INCLUDE and the
+      # build silently falls back to whatever link.exe was already on PATH
+      # (Git for Windows' coreutils `link`, not MSVC's linker).
       - name: Set up MSVC ARM64 cross-compilation environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: arm64
+          arch: amd64_arm64
 
       - name: Cache cargo registry and build artifacts
         uses: actions/cache@v4
