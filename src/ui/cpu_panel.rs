@@ -81,14 +81,14 @@ pub fn render_cpu_panel(buf: &mut Buffer, area: Rect, cpu: &CpuData, theme: &The
     if chunks.len() > 1 && chunks[1].width > 12 {
         let right = chunks[1];
         let num_cores = cpu.cores.len();
-        if num_cores > 0 {
+        if num_cores > 0 && right.height > 0 {
             let col_width = 16u16;
-            let num_cols = (right.width / col_width).max(1) as usize;
-            let rows_available = right.height as usize;
+            let (num_cols, rows_per_col) =
+                core_grid(num_cores, right.width / col_width, right.height as usize);
 
             for (idx, core) in cpu.cores.iter().enumerate() {
-                let col = idx / rows_available;
-                let row = idx % rows_available;
+                let col = idx / rows_per_col;
+                let row = idx % rows_per_col;
 
                 if col >= num_cols {
                     break;
@@ -132,6 +132,22 @@ pub fn render_cpu_panel(buf: &mut Buffer, area: Rect, cpu: &CpuData, theme: &The
     }
 }
 
+/// Lays out `num_cores` per-core rows into a column grid that fills the
+/// available width first, instead of only opening a new column once a
+/// single column would overflow `available_height` (which produced one
+/// tall stack of cores in practice, since panels are usually taller than
+/// they have cores). Returns `(num_cols, rows_per_col)`; cores are placed
+/// column-major (`col = idx / rows_per_col`, `row = idx % rows_per_col`).
+fn core_grid(num_cores: usize, max_cols_by_width: u16, available_height: usize) -> (usize, usize) {
+    let num_cols = (max_cols_by_width.max(1) as usize).min(num_cores);
+    let rows_per_col = num_cores.div_ceil(num_cols).max(1);
+    // If even the widest grid overflows the panel's height, cap rows at
+    // the available height; cores beyond num_cols * available_height are
+    // dropped by the caller's `col >= num_cols` check, same trade-off the
+    // panel always made when it ran out of space.
+    (num_cols, rows_per_col.min(available_height.max(1)))
+}
+
 /// Builds the CPU panel's block title, truncating `model_name` to fit the
 /// available border width with an ellipsis rather than letting ratatui
 /// silently clip it. Falls back to a bare " CPU " title when the panel is
@@ -173,5 +189,37 @@ mod tests {
     #[test]
     fn cpu_title_empty_name() {
         assert_eq!(cpu_title("", 30), " CPU ");
+    }
+
+    #[test]
+    fn core_grid_spreads_across_columns_when_width_allows() {
+        // Regression: 16 cores used to collapse into a single 16-row
+        // column whenever the panel was taller than 16 rows, even though
+        // the panel was wide enough for 3 columns.
+        assert_eq!(core_grid(16, 3, 20), (3, 6));
+    }
+
+    #[test]
+    fn core_grid_single_column_when_too_narrow() {
+        assert_eq!(core_grid(8, 1, 20), (1, 8));
+    }
+
+    #[test]
+    fn core_grid_never_exceeds_available_height() {
+        // Way too many cores for the space: rows are capped at the
+        // available height, columns stay at the width-derived max.
+        assert_eq!(core_grid(100, 3, 10), (3, 10));
+    }
+
+    #[test]
+    fn core_grid_does_not_open_empty_columns() {
+        // Fewer cores than columns the width would allow: don't spread
+        // 4 cores across 6 columns.
+        assert_eq!(core_grid(4, 6, 20), (4, 1));
+    }
+
+    #[test]
+    fn core_grid_single_core() {
+        assert_eq!(core_grid(1, 4, 20), (1, 1));
     }
 }
