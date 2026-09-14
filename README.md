@@ -1,91 +1,105 @@
 # wtop - Windows Terminal Resource Monitor
+> A TUI resource monitor for Windows with the aesthetic and visual density of `btop`, designed to have a **literally minimal** footprint on system resources.
 
-> Un monitor delle risorse TUI per Windows con l'estetica e la densità visiva di `btop`, progettato per avere un'impronta sulle risorse di sistema **letteralmente minima**.
+![Cover](resources/rdm1.png)
+
+[![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Windows 11](https://img.shields.io/badge/Windows_11-0078D6?style=for-the-badge&logo=windows11&logoColor=white)](https://www.microsoft.com/windows)
+[![ratatui](https://img.shields.io/badge/ratatui-0.29-blue?style=for-the-badge)](https://ratatui.rs/)
+[![crossterm](https://img.shields.io/badge/crossterm-0.28-blue?style=for-the-badge)](https://crates.io/crates/crossterm)
+[![Architecture](https://img.shields.io/badge/arch-x86__64%20%7C%20ARM64-informational?style=for-the-badge)](https://github.com/Vinello28/wtop/releases)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm_Noncommercial-red?style=for-the-badge)](LICENSE)
 
 ---
 
-## Caratteristiche Principali
+## Key Features
 
-- **Visualizzazione Completa dei Componenti Hardware**:
-  - **CPU**: Utilizzo globale con grafico storico Braille ad alta densità + barre di carico per singolo core logico (es. fino a 128 core) con gradiente verde → ambra → rosso corallo. Modello CPU estratto direttamente da CPUID (zero overhead).
-  - **RAM & Swap/Commit**: Memoria fisica usata, disponibile, totale, limite di commit e grafico storico dedicato.
-  - **Dischi & I/O**: Volumi montati (C:, D:, ecc.) con spazio libero/totale e throughput in tempo reale (MB/s o KB/s) sia in lettura che in scrittura tramite contatori ad alte prestazioni.
-  - **GPU**: Percentuale di utilizzo dei motori 3D/Compute (WDDM DirectX) + VRAM dedicata allocata + nome adattatore grafico.
-  - **Rete**: Monitoraggio in tempo reale del traffico di Download e Upload (KB/s, MB/s) tramite tabella interfaccia IP Helper nativa + totale sessione scaricato/inviato + nome adattatore attivo.
-  - **Processi**: Gestione avanzata dei processi di sistema ordinabili per CPU%, Memoria RSS, PID o Nome, con ricerca/filtro istantaneo (`/`) e terminazione del processo (`x` / `Delete`).
-- **Motore Grafico Braille Sub-Pixel**:
-  - Utilizzo dei caratteri Unicode Braille (`U+2800`–`U+28FF`) per una risoluzione di 2x4 sub-pixel per cella di testo, per curve fluide e dense identiche a `btop`.
-- **Doppio Tema TrueColor 24-bit**:
-  - **Tema Scuro**: Sfondo carbone scuro, accenti ciano/neon e gradienti RGB.
-  - **Tema Chiaro**: Sfondo alabastro/carta, accenti scuri ad alto contrasto per ambienti luminosi.
-  - Tasto rapido `t` per commutare all'istante tra i temi (salvato in configurazione).
-- **Frequenza di Campionamento Dinamica**:
-  - Regolabile al volo con `+` e `-` (250ms, 500ms, 1000ms, 2000ms, 5000ms).
+- **Full Hardware Component Visualization**:
+  - **CPU**: Global utilization with a high-density Braille history graph + per-logical-core load bars (up to 128 cores) with a green → amber → coral red gradient. CPU model extracted directly from CPUID (zero overhead).
+  - **RAM & Swap/Commit**: Used, available, and total physical memory, commit limit, and a dedicated history graph.
+  - **Disks & I/O**: Mounted volumes (C:, D:, etc.) with free/total space and real-time throughput (MB/s or KB/s) for both read and write via high-performance counters.
+  - **GPU**: 3D/Compute engine utilization percentage (WDDM DirectX) + allocated dedicated VRAM + graphics adapter name.
+  - **Network**: Real-time Download and Upload traffic monitoring (KB/s, MB/s) via the native IP Helper interface table + total session downloaded/uploaded + active adapter name.
+  - **Processes**: Advanced process management sortable by CPU%, RSS Memory, PID, or Name, with instant search/filter (`/`) and process termination (`x` / `Delete`).
+- **Sub-Pixel Braille Graphics Engine**:
+  - Uses Braille Unicode characters (`U+2800`–`U+28FF`) for a 2x4 sub-pixel resolution per text cell, producing smooth, dense curves identical to `btop`.
+- **Dual 24-bit TrueColor Theme**:
+  - **Dark Theme**: Dark charcoal background, cyan/neon accents, and RGB gradients.
+  - **Light Theme**: Alabaster/paper background, high-contrast dark accents for bright environments.
+  - `t` shortcut to instantly switch between themes (saved in configuration).
+- **Dynamic Sampling Rate**:
+  - Adjustable on the fly with `+` and `-` (250ms, 500ms, 1000ms, 2000ms, 5000ms).
 - **Zero-WMI Architecture**:
-  - Nessun uso di WMI (`WmiPrvSE.exe`), zero serializzazione COM lenta.
-  - Tutte le metriche sono raccolte tramite chiamate dirette Win32 / NTDLL kernel (`NtQuerySystemInformation`, `GlobalMemoryStatusEx`, `GetIfTable2`, PDH nativo).
-- **Thread Collector Isolato**:
-  - Un thread worker dedicato campiona l'hardware a basso livello e passa snapshot immutabili al thread grafico; la UI risponde istantaneamente a 60 FPS senza mai bloccarsi.
+  - No use of WMI (`WmiPrvSE.exe`), zero slow COM serialization.
+  - All metrics are collected via direct Win32 / NTDLL kernel calls (`NtQuerySystemInformation`, `GlobalMemoryStatusEx`, `GetIfTable2`, native PDH).
+- **Isolated Collector Thread**:
+  - A dedicated worker thread samples low-level hardware and passes immutable snapshots to the render thread; the UI responds instantly at 60 FPS and never blocks.
 
 ---
 
-## Prestazioni Misurate su Windows 11
+## Performance Measured on Windows 11
 
-| Metrica | Risultato Misurato |
+| Metric | Measured Result |
 | :--- | :--- |
-| **Impronta RAM (Working Set)** | **~18 MB** |
-| **Consumo CPU (attivo)** | **< 0.05%** (~0.3s tempo CPU su 5s di campionamento) |
-| **Dimensione Binario (.exe)** | **2.6 MB** (singolo file statico, zero dipendenze esterne) |
-| **Flickering del Terminale** | **0%** (Double-buffering VT100 / Virtual Terminal Processing) |
+| **RAM Footprint (Working Set)** | **~18 MB** |
+| **CPU Usage (active)** | **< 0.05%** (~0.3s CPU time over a 5s sampling window) |
+| **Binary Size (.exe)** | **2.6 MB** (single static file, zero external dependencies) |
+| **Terminal Flickering** | **0%** (VT100 / Virtual Terminal Processing double-buffering) |
 
 ---
 
-## Piattaforme Supportate
+## Supported Platforms
 
-Le release GitHub pubblicano un binario nativo per ciascuna architettura:
+GitHub releases publish a native binary for each architecture:
 
-| Architettura | Asset | Note |
+| Architecture | Asset | Notes |
 | :--- | :--- | :--- |
-| **x86_64** (Intel/AMD) | `wtop.exe` | Build primaria, testata direttamente |
-| **ARM64** (Windows on ARM, es. Snapdragon X) | `wtop-arm64.exe` | Build nativa cross-compilata in CI |
+| **x86_64** (Intel/AMD) | `wtop.exe` | Primary build, directly tested |
+| **ARM64** (Windows on ARM, e.g. Snapdragon X) | `wtop-arm64.exe` | Native build, cross-compiled in CI |
 
-L'auto-updater in-app riconosce automaticamente l'architettura del binario in esecuzione e scarica sempre l'asset corretto.
+The in-app auto-updater automatically detects the architecture of the running binary and always downloads the correct asset.
 
 ---
 
-## Scorciatoie da Tastiera
+## Keyboard Shortcuts
 
-| Tasto | Azione |
+| Key | Action |
 | :--- | :--- |
-| `Tab` / `Shift-Tab` | Cambia il pannello attivo (focus) |
-| `↑` / `↓` oppure `k` / `j` | Scorri l'elenco dei processi |
-| `PgUp` / `PgDn` | Salta 10 processi in alto / in basso |
-| `Home` / `End` | Vai all'inizio / fine della lista processi |
-| `c` | Ordina processi per **CPU %** |
-| `m` | Ordina processi per **Memoria RAM** |
-| `p` | Ordina processi per **PID** |
-| `n` | Ordina processi per **Nome** |
-| `d` | Inverte la direzione di ordinamento (Crescente / Decrescente) |
-| `/` | Attiva la ricerca/filtro dei processi in tempo reale |
-| `x` oppure `Delete` | Termina il processo selezionato (con richiesta di conferma `y`/`n`) |
-| `t` | Commuta tema (**Dark** ↔ **Light**) |
-| `+` / `-` | Aumenta o diminuisce la frequenza di campionamento |
-| `u` | Applica l'aggiornamento se una nuova versione è disponibile |
-| `?` oppure `h` | Mostra la finestra di aiuto con tutte le scorciatoie |
-| `q` oppure `Esc` | Chiudi wtop / Cancella filtro attivo |
+| `Tab` / `Shift-Tab` | Switch the active (focused) panel |
+| `↑` / `↓` or `k` / `j` | Scroll the process list |
+| `PgUp` / `PgDn` | Jump 10 processes up / down |
+| `Home` / `End` | Go to the start / end of the process list |
+| `c` | Sort processes by **CPU %** |
+| `m` | Sort processes by **RAM Memory** |
+| `p` | Sort processes by **PID** |
+| `n` | Sort processes by **Name** |
+| `d` | Reverse sort direction (Ascending / Descending) |
+| `/` | Enable real-time process search/filter |
+| `x` or `Delete` | Terminate the selected process (with `y`/`n` confirmation prompt) |
+| `t` | Toggle theme (**Dark** ↔ **Light**) |
+| `+` / `-` | Increase or decrease the sampling rate |
+| `u` | Apply the update if a new version is available |
+| `?` or `h` | Show the help window with all shortcuts |
+| `q` or `Esc` | Quit wtop / Clear active filter |
 
 ---
 
-## Compilazione ed Esecuzione
+## Building and Running
 
-### Esecuzione Diretta
+### Run Directly
 ```powershell
 .\target\release\wtop.exe
 ```
 
-### Compilazione da Sorgenti
+### Build from Source
 ```powershell
 cargo build --release
 ```
 
-La configurazione utente (tema preferito, frequenza di campionamento, ordinamento) viene salvata automaticamente in `%APPDATA%\wtop\config.json`.
+User configuration (preferred theme, sampling rate, sort order) is automatically saved to `%APPDATA%\wtop\config.json`.
+
+---
+
+## License
+
+wtop is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You're free to use, modify, and share it for any noncommercial purpose (personal use, research, education, hobby projects); commercial use requires a separate agreement with the copyright holder.
