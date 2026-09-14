@@ -17,29 +17,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Cheap, fails fast: the self-updater trusts the tag to match the binary's
-  # compiled-in CARGO_PKG_VERSION, so a mismatch must stop the whole release
-  # before either architecture spends build minutes.
-  check-version:
+  build-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify tag matches Cargo.toml version
+
+      # The tag is the single source of truth for the release version -- no
+      # need to keep Cargo.toml's [package] version in sync by hand before
+      # tagging. This only rewrites the checkout inside this CI job, never
+      # commits back, so the tagged commit itself is untouched.
+      - name: Sync Cargo.toml version to release tag
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}" -replace '^v',''
-          $cargoVersion = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
-          if ($tag -ne $cargoVersion) {
-            Write-Error "Tag v$tag does not match Cargo.toml version $cargoVersion"
-            exit 1
-          }
-          Write-Host "Tag v$tag matches Cargo.toml version $cargoVersion"
-
-  build-x64:
-    needs: check-version
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          (Get-Content Cargo.toml -Raw) -replace '(?m)^version = ".*"', "version = `"$version`"" | Set-Content Cargo.toml -NoNewline
+          Write-Host "Cargo.toml version set to $version (from tag ${{ github.ref_name }})"
 
       - name: Install GNU-host Rust toolchain
         run: |
@@ -47,11 +39,16 @@ jobs:
           rustup default stable-x86_64-pc-windows-gnu
         shell: bash
 
+      # `location` is pinned explicitly: setup-msys2's default ("fresh
+      # install", i.e. release: true) does not guarantee landing at
+      # C:\msys64 -- it can install into a temp path instead, which would
+      # silently break .cargo/config.toml's hardcoded linker path.
       - name: Set up MSYS2 UCRT64 (GCC toolchain)
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           install: mingw-w64-ucrt-x86_64-gcc
+          location: C:\msys64
           update: true
 
       - name: Cache cargo registry and build artifacts
@@ -86,10 +83,16 @@ jobs:
           retention-days: 1
 
   build-arm64:
-    needs: check-version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Sync Cargo.toml version to release tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          (Get-Content Cargo.toml -Raw) -replace '(?m)^version = ".*"', "version = `"$version`"" | Set-Content Cargo.toml -NoNewline
+          Write-Host "Cargo.toml version set to $version (from tag ${{ github.ref_name }})"
 
       # Native ARM64 Windows build: unlike the x64 job, this targets MSVC
       # (there's no MSYS2/mingw-w64 toolchain for aarch64-pc-windows-*), so

@@ -25,13 +25,16 @@ jobs:
           rustup default stable-x86_64-pc-windows-gnu
         shell: bash
 
-      # Installs to C:\msys64 by default, matching .cargo/config.toml's
-      # hardcoded linker/ar paths.
+      # `location` is pinned explicitly: setup-msys2's default ("fresh
+      # install", i.e. release: true) does not guarantee landing at
+      # C:\msys64 -- it can install into a temp path instead, which would
+      # silently break .cargo/config.toml's hardcoded linker path.
       - name: Set up MSYS2 UCRT64 (GCC toolchain)
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           install: mingw-w64-ucrt-x86_64-gcc
+          location: C:\msys64
           update: true
 
       - name: Cache cargo registry and build artifacts
