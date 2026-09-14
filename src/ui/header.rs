@@ -67,7 +67,14 @@ pub fn render_header(
         draw_str_with(buf, start_x, y, right, &badges, |ch| {
             if ch == '[' || ch == ']' {
                 Style::default().fg(theme.border_normal)
-            } else if ch == '?' || ch == 'q' || ch == 't' || ch == 'u' || ch == 'g' || ch == '+' || ch == '-' {
+            } else if ch == '?'
+                || ch == 'q'
+                || ch == 't'
+                || ch == 'u'
+                || ch == 'g'
+                || ch == '+'
+                || ch == '-'
+            {
                 Style::default()
                     .fg(theme.title_focused)
                     .add_modifier(Modifier::BOLD)

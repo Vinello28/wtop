@@ -16,7 +16,12 @@ pub struct StackedSeries<'a> {
 /// own max (floor 1024) rather than a shared one, so two very differently
 /// -sized series (e.g. download vs. upload) don't squash each other flat.
 /// Used by the disk (read/write) and network (down/up) panels.
-pub fn render_stacked_charts(buf: &mut Buffer, area: Rect, top: StackedSeries, bottom: StackedSeries) {
+pub fn render_stacked_charts(
+    buf: &mut Buffer,
+    area: Rect,
+    top: StackedSeries,
+    bottom: StackedSeries,
+) {
     if area.width < 1 || area.height < 1 {
         return;
     }
@@ -41,7 +46,8 @@ pub fn render_stacked_charts(buf: &mut Buffer, area: Rect, top: StackedSeries, b
             width: area.width,
             height: bottom_h,
         };
-        BrailleChart::new(bottom.data, bottom_max, bottom.low, bottom.high).render(bottom_area, buf);
+        BrailleChart::new(bottom.data, bottom_max, bottom.low, bottom.high)
+            .render(bottom_area, buf);
     }
 }
 

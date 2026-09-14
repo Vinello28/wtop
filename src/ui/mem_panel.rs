@@ -8,7 +8,13 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
-pub fn render_mem_panel(buf: &mut Buffer, area: Rect, mem: &MemoryData, theme: &Theme, focused: bool) {
+pub fn render_mem_panel(
+    buf: &mut Buffer,
+    area: Rect,
+    mem: &MemoryData,
+    theme: &Theme,
+    focused: bool,
+) {
     if area.width < 10 || area.height < 4 {
         return;
     }
@@ -51,7 +57,13 @@ pub fn render_mem_panel(buf: &mut Buffer, area: Rect, mem: &MemoryData, theme: &
             width: inner.width,
             height: 1,
         };
-        render_dual_bar(buf, bar_area, mem.usage_pct, theme.mem_primary, theme.border_normal);
+        render_dual_bar(
+            buf,
+            bar_area,
+            mem.usage_pct,
+            theme.mem_primary,
+            theme.border_normal,
+        );
     }
 
     if inner.height >= 3 {

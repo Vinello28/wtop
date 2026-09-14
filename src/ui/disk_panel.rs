@@ -8,7 +8,13 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
-pub fn render_disk_panel(buf: &mut Buffer, area: Rect, io: &DiskIoData, theme: &Theme, focused: bool) {
+pub fn render_disk_panel(
+    buf: &mut Buffer,
+    area: Rect,
+    io: &DiskIoData,
+    theme: &Theme,
+    focused: bool,
+) {
     if area.width < 10 || area.height < 4 {
         return;
     }

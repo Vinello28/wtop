@@ -15,7 +15,13 @@ const TITLE_FRAME_LEN: usize = 11;
 /// Width of the vertical download/upload readout column.
 const STATS_COL_WIDTH: u16 = 20;
 
-pub fn render_net_panel(buf: &mut Buffer, area: Rect, net: &NetworkData, theme: &Theme, focused: bool) {
+pub fn render_net_panel(
+    buf: &mut Buffer,
+    area: Rect,
+    net: &NetworkData,
+    theme: &Theme,
+    focused: bool,
+) {
     if area.width < 10 || area.height < 4 {
         return;
     }
