@@ -203,6 +203,16 @@ fn apply_update(info: &ReleaseInfo) -> Result<(), UpdaterError> {
     std::fs::rename(&current_exe, &old)?;
     std::fs::rename(&staged, &current_exe)?;
 
+    // Best-effort immediate cleanup: the old binary is only renamed here,
+    // still backing this running process's image, so deleting it now relies
+    // on the same FILE_SHARE_DELETE semantics the rename above already used
+    // -- it disappears from the directory right away and its disk space is
+    // reclaimed once this process exits (which happens moments later, see
+    // UpdateStatus::Ready in main.rs). cleanup_previous_update() at the next
+    // startup remains as a fallback for the rare case this is blocked (e.g.
+    // an AV scanner briefly holding its own handle).
+    let _ = std::fs::remove_file(&old);
+
     Command::new(&current_exe).spawn()?;
     Ok(())
 }

@@ -7,8 +7,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivePanel {
     Cpu,
-    MemDisk,
-    NetGpu,
+    Memory,
+    Disk,
+    Gpu,
+    Network,
     Processes,
 }
 
@@ -135,6 +137,9 @@ impl AppState {
                     self.pending_update_confirm = true;
                 }
             }
+            KeyCode::Char('g') => {
+                crate::browser::open_url("https://github.com/Vinello28");
+            }
             KeyCode::Char('t') => {
                 self.config.theme = match self.config.theme {
                     ThemeMode::Dark => ThemeMode::Light,
@@ -252,15 +257,19 @@ impl AppState {
 
     fn cycle_panel(&mut self, reverse: bool) {
         self.active_panel = match (self.active_panel, reverse) {
-            (ActivePanel::Cpu, false) => ActivePanel::MemDisk,
-            (ActivePanel::MemDisk, false) => ActivePanel::NetGpu,
-            (ActivePanel::NetGpu, false) => ActivePanel::Processes,
+            (ActivePanel::Cpu, false) => ActivePanel::Memory,
+            (ActivePanel::Memory, false) => ActivePanel::Disk,
+            (ActivePanel::Disk, false) => ActivePanel::Gpu,
+            (ActivePanel::Gpu, false) => ActivePanel::Network,
+            (ActivePanel::Network, false) => ActivePanel::Processes,
             (ActivePanel::Processes, false) => ActivePanel::Cpu,
 
             (ActivePanel::Cpu, true) => ActivePanel::Processes,
-            (ActivePanel::Processes, true) => ActivePanel::NetGpu,
-            (ActivePanel::NetGpu, true) => ActivePanel::MemDisk,
-            (ActivePanel::MemDisk, true) => ActivePanel::Cpu,
+            (ActivePanel::Processes, true) => ActivePanel::Network,
+            (ActivePanel::Network, true) => ActivePanel::Gpu,
+            (ActivePanel::Gpu, true) => ActivePanel::Disk,
+            (ActivePanel::Disk, true) => ActivePanel::Memory,
+            (ActivePanel::Memory, true) => ActivePanel::Cpu,
         };
     }
 

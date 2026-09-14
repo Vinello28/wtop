@@ -47,6 +47,7 @@ pub fn render_help_modal(buf: &mut Buffer, area: Rect, theme: &Theme) {
         ("t", "Toggle Theme (Dark ↔ Light)"),
         ("+ / -", "Increase / decrease sampling interval"),
         ("u", "Check for / apply an available update"),
+        ("g", "Open the developer's GitHub profile in your browser"),
         ("? / h", "Toggle this Help window"),
         ("q / Esc", "Quit wtop / Cancel current action"),
     ];

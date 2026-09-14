@@ -4,6 +4,47 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
+/// One series (history + low/high gradient colors) for [`render_stacked_charts`].
+pub struct StackedSeries<'a> {
+    pub data: &'a [f64],
+    pub low: Color,
+    pub high: Color,
+}
+
+/// Renders two independently-scaled Braille history graphs stacked
+/// vertically in one area -- `top` above, `bottom` below, each scaled to its
+/// own max (floor 1024) rather than a shared one, so two very differently
+/// -sized series (e.g. download vs. upload) don't squash each other flat.
+/// Used by the disk (read/write) and network (down/up) panels.
+pub fn render_stacked_charts(buf: &mut Buffer, area: Rect, top: StackedSeries, bottom: StackedSeries) {
+    if area.width < 1 || area.height < 1 {
+        return;
+    }
+
+    let top_h = area.height.div_ceil(2);
+    let bottom_h = area.height - top_h;
+
+    let top_max = top.data.iter().copied().fold(1024.0_f64, f64::max);
+    let top_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: top_h,
+    };
+    BrailleChart::new(top.data, top_max, top.low, top.high).render(top_area, buf);
+
+    if bottom_h > 0 {
+        let bottom_max = bottom.data.iter().copied().fold(1024.0_f64, f64::max);
+        let bottom_area = Rect {
+            x: area.x,
+            y: area.y + top_h,
+            width: area.width,
+            height: bottom_h,
+        };
+        BrailleChart::new(bottom.data, bottom_max, bottom.low, bottom.high).render(bottom_area, buf);
+    }
+}
+
 pub struct BrailleChart<'a> {
     data: &'a [f64],
     max_val: f64,

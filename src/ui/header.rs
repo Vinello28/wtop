@@ -47,6 +47,7 @@ pub fn render_header(
         UpdateStatus::Ready => Some("[u: Relaunching...]".to_string()),
         UpdateStatus::Idle | UpdateStatus::Error(_) => None,
     };
+    let github_badge = "[g: GitHub]";
     let help_badge = "[?: Help]";
     let quit_badge = "[q: Quit]";
 
@@ -55,7 +56,10 @@ pub fn render_header(
         badges.push_str(update_badge);
         badges.push_str("  ");
     }
-    badges.push_str(&format!("{}  {} ", help_badge, quit_badge));
+    badges.push_str(&format!(
+        "{}  {}  {} ",
+        github_badge, help_badge, quit_badge
+    ));
     let badges_len = badges.chars().count() as u16;
 
     if area.width > badges_len + 20 {
@@ -63,7 +67,7 @@ pub fn render_header(
         draw_str_with(buf, start_x, y, right, &badges, |ch| {
             if ch == '[' || ch == ']' {
                 Style::default().fg(theme.border_normal)
-            } else if ch == '?' || ch == 'q' || ch == 't' || ch == 'u' || ch == '+' || ch == '-' {
+            } else if ch == '?' || ch == 'q' || ch == 't' || ch == 'u' || ch == 'g' || ch == '+' || ch == '-' {
                 Style::default()
                     .fg(theme.title_focused)
                     .add_modifier(Modifier::BOLD)

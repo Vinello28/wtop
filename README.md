@@ -79,6 +79,7 @@ The in-app auto-updater automatically detects the architecture of the running bi
 | `t` | Toggle theme (**Dark** ↔ **Light**) |
 | `+` / `-` | Increase or decrease the sampling rate |
 | `u` | Apply the update if a new version is available |
+| `g` | Open the developer's GitHub profile in your default browser |
 | `?` or `h` | Show the help window with all shortcuts |
 | `q` or `Esc` | Quit wtop / Clear active filter |
 
