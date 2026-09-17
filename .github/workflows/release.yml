@@ -196,8 +196,38 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish GitHub Release
+      # softprops/action-gh-release uploads all assets in parallel with no
+      # retry/timeout handling, and GitHub's API intermittently fails
+      # mid-upload with an opaque "Error saving asset" (a known upstream
+      # issue, not specific to this project). Splitting release creation
+      # from asset upload, then uploading one file at a time with retries
+      # via the gh CLI, is the standard workaround.
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
           generate_release_notes: true
+
+      - name: Upload release assets (sequential, with retries)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $files = Get-ChildItem -Path dist -File
+          foreach ($file in $files) {
+            $uploaded = $false
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              Write-Host "Uploading $($file.Name) (attempt $attempt/3)..."
+              gh release upload $tag $file.FullName --clobber
+              if ($LASTEXITCODE -eq 0) {
+                $uploaded = $true
+                break
+              }
+              Write-Host "Upload failed, retrying in 15s..."
+              Start-Sleep -Seconds 15
+            }
+            if (-not $uploaded) {
+              Write-Error "Failed to upload $($file.Name) after 3 attempts"
+              exit 1
+            }
+          }
