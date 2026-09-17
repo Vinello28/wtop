@@ -213,12 +213,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
           $files = Get-ChildItem -Path dist -File
           foreach ($file in $files) {
             $uploaded = $false
             for ($attempt = 1; $attempt -le 3; $attempt++) {
               Write-Host "Uploading $($file.Name) (attempt $attempt/3)..."
-              gh release upload $tag $file.FullName --clobber
+              gh release upload $tag $file.FullName --clobber -R $repo
               if ($LASTEXITCODE -eq 0) {
                 $uploaded = $true
                 break
