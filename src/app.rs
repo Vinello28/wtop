@@ -9,6 +9,7 @@ pub enum ActivePanel {
     Cpu,
     Memory,
     Disk,
+    Battery,
     Gpu,
     Network,
     Processes,
@@ -259,7 +260,8 @@ impl AppState {
         self.active_panel = match (self.active_panel, reverse) {
             (ActivePanel::Cpu, false) => ActivePanel::Memory,
             (ActivePanel::Memory, false) => ActivePanel::Disk,
-            (ActivePanel::Disk, false) => ActivePanel::Gpu,
+            (ActivePanel::Disk, false) => ActivePanel::Battery,
+            (ActivePanel::Battery, false) => ActivePanel::Gpu,
             (ActivePanel::Gpu, false) => ActivePanel::Network,
             (ActivePanel::Network, false) => ActivePanel::Processes,
             (ActivePanel::Processes, false) => ActivePanel::Cpu,
@@ -267,7 +269,8 @@ impl AppState {
             (ActivePanel::Cpu, true) => ActivePanel::Processes,
             (ActivePanel::Processes, true) => ActivePanel::Network,
             (ActivePanel::Network, true) => ActivePanel::Gpu,
-            (ActivePanel::Gpu, true) => ActivePanel::Disk,
+            (ActivePanel::Gpu, true) => ActivePanel::Battery,
+            (ActivePanel::Battery, true) => ActivePanel::Disk,
             (ActivePanel::Disk, true) => ActivePanel::Memory,
             (ActivePanel::Memory, true) => ActivePanel::Cpu,
         };

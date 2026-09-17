@@ -25,6 +25,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_NetworkManagement_Ndis",
     "Win32_Storage_FileSystem",
     "Win32_System_Performance",
+    "Win32_System_Power",
     "Win32_System_LibraryLoader",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",

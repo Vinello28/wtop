@@ -1,3 +1,4 @@
+pub mod battery_panel;
 pub mod braille;
 pub mod cpu_panel;
 pub mod disk_panel;

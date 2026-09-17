@@ -1,3 +1,4 @@
+pub mod battery;
 pub mod cpu;
 pub mod gpu;
 pub mod io;
@@ -5,6 +6,7 @@ pub mod memory;
 pub mod network;
 pub mod process;
 
+use self::battery::BatteryCollector;
 use self::cpu::CpuCollector;
 use self::gpu::GpuCollector;
 use self::io::IoCollector;
@@ -21,6 +23,7 @@ pub struct SystemCollector {
     io: IoCollector,
     gpu: GpuCollector,
     net: NetworkCollector,
+    battery: BatteryCollector,
     proc: ProcessCollector,
 }
 
@@ -36,6 +39,7 @@ impl SystemCollector {
             io: IoCollector::new(history_len),
             gpu: GpuCollector::new(history_len),
             net: NetworkCollector::new(history_len),
+            battery: BatteryCollector::new(history_len),
             proc: ProcessCollector::new(num_cores),
         }
     }
@@ -47,6 +51,7 @@ impl SystemCollector {
         let io_data = self.io.collect();
         let gpu_data = self.gpu.collect();
         let net_data = self.net.collect();
+        let battery_data = self.battery.collect();
         let processes = self
             .proc
             .collect(config.proc_sort_by, config.proc_sort_desc, filter);
@@ -59,6 +64,7 @@ impl SystemCollector {
             io: io_data,
             gpu: gpu_data,
             net: net_data,
+            battery: battery_data,
             processes,
         }
     }

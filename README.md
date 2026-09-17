@@ -22,6 +22,7 @@
   - **Disks & I/O**: Mounted volumes (C:, D:, etc.) with free/total space and real-time throughput (MB/s or KB/s) for both read and write via high-performance counters.
   - **GPU**: 3D/Compute engine utilization percentage (WDDM DirectX) + allocated dedicated VRAM + graphics adapter name.
   - **Network**: Real-time Download and Upload traffic monitoring (KB/s, MB/s) via the native IP Helper interface table + total session downloaded/uploaded + active adapter name.
+  - **Battery**: Charge percentage, AC/charging/discharging state, and remaining time on laptops, with its own history graph. Shown in the free space below **Disks & I/O** whenever a battery is present; hidden entirely on desktops.
   - **Processes**: Advanced process management sortable by CPU%, RSS Memory, PID, or Name, with instant search/filter (`/`) and process termination (`x` / `Delete`).
 - **Sub-Pixel Braille Graphics Engine**:
   - Uses Braille Unicode characters (`U+2800`–`U+28FF`) for a 2x4 sub-pixel resolution per text cell, producing smooth, dense curves identical to `btop`.
@@ -100,6 +101,18 @@ cargo build --release
 ```
 
 User configuration (preferred theme, sampling rate, sort order) is automatically saved to `%APPDATA%\wtop\config.json`.
+
+### Command-Line / Snapshot Mode
+
+For scripting or logging, wtop can print a single sample and exit instead of launching the TUI:
+
+```powershell
+wtop --once      # Plain-text snapshot
+wtop --json      # JSON snapshot (full process list, no truncation)
+wtop -h, --help  # Usage
+```
+
+A snapshot takes ~500ms to report accurate rates (CPU%, disk/network throughput, per-process CPU%), since those metrics need two samples to compute a delta.
 
 ---
 

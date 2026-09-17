@@ -1,5 +1,7 @@
 use crate::app::{ActivePanel, AppState};
+use crate::model::{BatteryData, DiskIoData};
 use crate::theme::Theme;
+use crate::ui::battery_panel::render_battery_panel;
 use crate::ui::cpu_panel::render_cpu_panel;
 use crate::ui::disk_panel::render_disk_panel;
 use crate::ui::gpu_panel::render_gpu_panel;
@@ -12,6 +14,57 @@ use crate::ui::update_modal::render_update_confirm;
 use crate::updater::UpdateStatus;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+
+/// Fixed height (borders included) given to the battery panel when it's
+/// carved out of the bottom of the disk panel's cell.
+const BATTERY_PANEL_HEIGHT: u16 = 7;
+/// Disk needs at least this much room left over to still look reasonable
+/// (I/O line + a couple of chart rows + at least one partition); below
+/// `DISK_MIN_HEIGHT + BATTERY_PANEL_HEIGHT` the battery panel is skipped
+/// entirely and disk keeps the whole cell, same trade-off already made for
+/// GPU/NETWORK in the narrow layout below.
+const DISK_MIN_HEIGHT: u16 = 8;
+
+/// Splits a disk panel's cell into a (possibly smaller) disk area and an
+/// optional battery area stacked directly below it -- reclaiming space the
+/// disk panel usually leaves blank, since its content rarely fills a whole
+/// grid cell. Returns `(disk_area, None)` unchanged when there's no battery
+/// to show or not enough spare height to show it decently.
+fn split_disk_and_battery(area: Rect, battery_present: bool) -> (Rect, Option<Rect>) {
+    if !battery_present || area.height < DISK_MIN_HEIGHT + BATTERY_PANEL_HEIGHT {
+        return (area, None);
+    }
+    let disk_h = area.height - BATTERY_PANEL_HEIGHT;
+    let disk_area = Rect {
+        height: disk_h,
+        ..area
+    };
+    let battery_area = Rect {
+        y: area.y + disk_h,
+        height: BATTERY_PANEL_HEIGHT,
+        ..area
+    };
+    (disk_area, Some(battery_area))
+}
+
+/// Renders the disk panel into `area`, carving off a battery panel below it
+/// when there's room and a battery is present. Shared by all three layout
+/// tiers so the space-reclaiming logic lives in one place.
+fn render_disk_and_battery(
+    buf: &mut Buffer,
+    area: Rect,
+    io: &DiskIoData,
+    battery: &BatteryData,
+    theme: &Theme,
+    disk_focused: bool,
+    battery_focused: bool,
+) {
+    let (disk_area, battery_area) = split_disk_and_battery(area, battery.is_present);
+    render_disk_panel(buf, disk_area, io, theme, disk_focused);
+    if let Some(battery_area) = battery_area {
+        render_battery_panel(buf, battery_area, battery, theme, battery_focused);
+    }
+}
 
 pub fn render_ui(buf: &mut Buffer, area: Rect, state: &AppState, theme: &Theme) {
     if area.width < 30 || area.height < 10 {
@@ -97,12 +150,14 @@ fn render_wide_layout(buf: &mut Buffer, workspace: Rect, state: &AppState, theme
         theme,
         state.active_panel == ActivePanel::Memory,
     );
-    render_disk_panel(
+    render_disk_and_battery(
         buf,
         top[2],
         &state.snapshot.io,
+        &state.snapshot.battery,
         theme,
         state.active_panel == ActivePanel::Disk,
+        state.active_panel == ActivePanel::Battery,
     );
 
     render_gpu_panel(
@@ -161,12 +216,14 @@ fn render_medium_layout(buf: &mut Buffer, workspace: Rect, state: &AppState, the
         theme,
         state.active_panel == ActivePanel::Memory,
     );
-    render_disk_panel(
+    render_disk_and_battery(
         buf,
         mem_disk[1],
         &state.snapshot.io,
+        &state.snapshot.battery,
         theme,
         state.active_panel == ActivePanel::Disk,
+        state.active_panel == ActivePanel::Battery,
     );
 
     let gpu_net = Layout::default()
@@ -226,12 +283,14 @@ fn render_narrow_layout(buf: &mut Buffer, workspace: Rect, state: &AppState, the
         theme,
         state.active_panel == ActivePanel::Memory,
     );
-    render_disk_panel(
+    render_disk_and_battery(
         buf,
         v_chunks[2],
         &state.snapshot.io,
+        &state.snapshot.battery,
         theme,
         state.active_panel == ActivePanel::Disk,
+        state.active_panel == ActivePanel::Battery,
     );
     render_proc_panel(
         buf,
@@ -252,5 +311,46 @@ fn proc_panel_view(state: &AppState) -> ProcPanelView<'_> {
         filter: &state.proc_filter,
         is_filtering: state.is_filtering,
         pending_kill: state.pending_kill,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_disk_and_battery_no_battery_keeps_full_area() {
+        let area = Rect::new(0, 0, 30, 40);
+        let (disk, battery) = split_disk_and_battery(area, false);
+        assert_eq!(disk, area);
+        assert!(battery.is_none());
+    }
+
+    #[test]
+    fn split_disk_and_battery_too_short_skips_battery() {
+        // Just under the DISK_MIN_HEIGHT + BATTERY_PANEL_HEIGHT threshold.
+        let area = Rect::new(0, 0, 30, DISK_MIN_HEIGHT + BATTERY_PANEL_HEIGHT - 1);
+        let (disk, battery) = split_disk_and_battery(area, true);
+        assert_eq!(disk, area);
+        assert!(battery.is_none());
+    }
+
+    #[test]
+    fn split_disk_and_battery_carves_out_bottom_slice() {
+        let area = Rect::new(5, 2, 30, 20);
+        let (disk, battery) = split_disk_and_battery(area, true);
+        let battery = battery.expect("battery area expected when there's enough height");
+
+        assert_eq!(battery.height, BATTERY_PANEL_HEIGHT);
+        assert_eq!(disk.height, area.height - BATTERY_PANEL_HEIGHT);
+        // Battery sits directly below disk, same x/width, inside the
+        // original area.
+        assert_eq!(disk.y, area.y);
+        assert_eq!(battery.y, disk.y + disk.height);
+        assert_eq!(battery.y + battery.height, area.y + area.height);
+        assert_eq!(disk.x, area.x);
+        assert_eq!(battery.x, area.x);
+        assert_eq!(disk.width, area.width);
+        assert_eq!(battery.width, area.width);
     }
 }

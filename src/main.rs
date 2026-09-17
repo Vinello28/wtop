@@ -1,5 +1,6 @@
 mod app;
 mod browser;
+mod cli;
 mod collectors;
 mod config;
 mod model;
@@ -37,6 +38,12 @@ fn setup_panic_hook() {
 }
 
 fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match cli::handle_args(&args) {
+        cli::Action::Exit(code) => std::process::exit(code),
+        cli::Action::RunTui => {}
+    }
+
     setup_panic_hook();
 
     // Enable raw mode and alternate screen
